@@ -985,7 +985,9 @@ function requestToken(interactive){
 }
 
 async function sheetsFetch(path, options={}, retried){
-  if(!gapiToken) await requestToken(true);
+  if(!gapiToken){
+    try{ await requestToken(false); }catch(e){ await requestToken(true); }
+  }
   const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${path}`, {
     ...options,
     headers:{
@@ -1083,7 +1085,11 @@ async function connectGoogle(){
   document.getElementById('authError').style.display='none';
   try{
     await requestToken(true);
-    showSheetStep();
+    if(getSheetId()){
+      await bootApp();
+    } else {
+      showSheetStep();
+    }
   }catch(err){
     document.getElementById('authError').textContent = 'Login cancelado ou recusado. Tente de novo.';
     document.getElementById('authError').style.display='block';
