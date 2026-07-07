@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zerado — recibo de dívidas e metas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg-outer:#12211A;
+    --bg-outer-2:#0B1712;
+    --paper:#ECEFE7;
+    --paper-2:#DFE4D7;
+    --paper-3:#D3D9C9;
+    --ink:#202C24;
+    --ink-soft:#5B6A5D;
+    --ink-faint:#8B9A8B;
+    --line:#B9C2AD;
+    --cash:#1F6F49;
+    --cash-bright:#2E9463;
+    --stamp:#A5393A;
+    --gold:#B08333;
+    --shadow:rgba(0,0,0,0.5);
+  }
+  *{box-sizing:border-box;}
+  html{background:var(--bg-outer);}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 50% -10%, #1A2E23 0%, var(--bg-outer) 55%, var(--bg-outer-2) 100%);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:36px 14px 60px;
+  }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  .type{ font-family:'Courier Prime',monospace; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; }
+  }
+
+  /* ===================== RECEIPT SHELL ===================== */
+  .receipt-shell{
+    max-width:620px;
+    margin:0 auto;
+    transform:rotate(-0.35deg);
+    filter:drop-shadow(0 22px 34px var(--shadow));
+  }
+  .torn{
+    height:13px;
+    background-image:
+      linear-gradient(135deg, var(--paper) 50%, transparent 50.5%),
+      linear-gradient(45deg, var(--paper) 50%, transparent 50.5%);
+    background-size:17px 17px;
+    background-position:0 0, 8.5px 0;
+    background-repeat:repeat-x;
+  }
+  .torn.bottom{ transform:scaleY(-1); }
+
+  .receipt-body{
+    background:var(--paper);
+    padding:0 26px 30px;
+  }
+
+  /* perforation strip used between sections */
+  .perf{
+    height:10px;
+    margin:22px -26px;
+    background-image: radial-gradient(circle, var(--bg-outer) 2.6px, transparent 2.8px);
+    background-size:15px 10px;
+    background-position:center;
+    background-repeat:repeat-x;
+    position:relative;
+  }
+  .perf::before, .perf::after{
+    content:"";
+    position:absolute; top:50%; width:26px; height:26px;
+    background:var(--bg-outer-2); border-radius:50%;
+    transform:translateY(-50%);
+  }
+  .perf::before{ left:-13px; }
+  .perf::after{ right:-13px; }
+
+  /* ===================== HEADER ===================== */
+  .receipt-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding-top:22px;
+    gap:14px;
+  }
+  .brand h1{
+    margin:0;
+    font-size:26px;
+    letter-spacing:.02em;
+    font-weight:700;
+  }
+  .brand .tag{
+    color:var(--ink-soft);
+    font-size:11.5px;
+    margin-top:3px;
+    letter-spacing:.02em;
+  }
+  .meta-block{
+    text-align:right;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    line-height:1.6;
+    white-space:nowrap;
+  }
+  .barcode{
+    display:flex;
+    align-items:flex-end;
+    gap:1.5px;
+    height:26px;
+    margin-bottom:4px;
+    justify-content:flex-end;
+  }
+  .barcode span{
+    display:block;
+    width:2px;
+    background:var(--ink);
+  }
+
+  .phrase-strip{
+    margin-top:16px;
+    padding:12px 0 4px;
+    border-top:1px dashed var(--line);
+    border-bottom:1px dashed var(--line);
+  }
+  .phrase-strip p{
+    margin:0 0 6px;
+    font-family:'Courier Prime',monospace;
+    font-style:italic;
+    font-size:14.5px;
+    line-height:1.55;
+    color:var(--ink);
+  }
+  .phrase-strip p::before{ content:"“ "; }
+  .phrase-strip p::after{ content:" ”"; }
+  .phrase-refresh{
+    background:none;border:none;color:var(--ink-faint);
+    cursor:pointer; font-size:11px; text-decoration:underline;
+    padding:0 0 6px; font-family:'Inter',sans-serif;
+  }
+  .phrase-refresh:hover{ color:var(--cash); }
+
+  /* ===================== TABS (ticket stubs) ===================== */
+  nav.tabs{
+    display:flex;
+    gap:6px;
+    margin:20px 0 0;
+  }
+  nav.tabs button{
+    flex:1;
+    background:var(--paper-2);
+    border:none;
+    color:var(--ink-soft);
+    font-family:'Courier Prime',monospace;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:.03em;
+    padding:12px 6px 16px;
+    cursor:pointer;
+    clip-path: polygon(0 0, 100% 0, 100% 78%, 56% 78%, 50% 100%, 44% 78%, 0 78%);
+  }
+  nav.tabs button.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  nav.tabs button:hover:not(.active){ background:var(--paper-3); }
+
+  .panel{ padding-top:22px; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  h2.section-title{
+    font-family:'Courier Prime',monospace;
+    font-weight:700;
+    font-size:16.5px;
+    margin:0 0 3px;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+  }
+  .section-sub{
+    color:var(--ink-soft);
+    font-size:12.5px;
+    margin:0 0 16px;
+  }
+
+  /* ===================== RULER (signature element) ===================== */
+  .ruler-wrap{
+    position:relative;
+    margin-bottom:6px;
+    padding:14px 14px 12px;
+    background:var(--paper-2);
+    border:1px solid var(--paper-3);
+    border-radius:2px;
+  }
+  .ruler-total{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .ruler-total .label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    color:var(--ink-soft);
+  }
+  .ruler-total .value{
+    font-size:27px;
+    font-weight:700;
+  }
+  .ruler-total .value.zero{ color:var(--cash); }
+  .ruler-track{
+    position:relative;
+    height:22px;
+    background:var(--paper);
+    border:1px solid var(--paper-3);
+    overflow:hidden;
+    display:flex;
+    gap:2px;
+    padding:2px;
+  }
+  .ruler-track .seg{
+    flex:1;
+    background:var(--paper-3);
+    border-radius:1px;
+  }
+  .ruler-track .seg.filled{ background:var(--stamp); }
+  .ruler-caption{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+  .stamp{
+    position:absolute;
+    top:-10px; right:10px;
+    border:3px double var(--cash);
+    color:var(--cash);
+    font-family:'Courier Prime',monospace;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:.1em;
+    padding:4px 9px;
+    transform:rotate(-8deg);
+    opacity:0;
+    mix-blend-mode:multiply;
+    border-radius:3px;
+    pointer-events:none;
+    background:rgba(46,148,99,0.05);
+  }
+  .stamp.show{
+    opacity:0.9;
+    animation:stampDown .35s ease-out;
+  }
+  @keyframes stampDown{
+    0%{ opacity:0; transform:rotate(-22deg) scale(1.6); }
+    70%{ opacity:0.95; transform:rotate(-6deg) scale(0.96); }
+    100%{ opacity:0.9; transform:rotate(-8deg) scale(1); }
+  }
+
+  /* ===================== FORM ===================== */
+  .add-form{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin:18px 0 20px;
+    padding:14px;
+    background:var(--paper-2);
+    border:1px solid var(--paper-3);
+  }
+  .add-form .full{ grid-column:1/-1; }
+  label.field-label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    color:var(--ink-soft);
+    display:block;
+    margin-bottom:4px;
+  }
+  input, select{
+    width:100%;
+    background:var(--paper);
+    border:1px solid var(--paper-3);
+    color:var(--ink);
+    padding:9px 10px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    border-radius:2px;
+  }
+  input:focus, select:focus{
+    outline:2px solid var(--cash-bright);
+    outline-offset:1px;
+  }
+  .btn{
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    padding:10px 16px;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    font-family:'Courier Prime',monospace;
+    cursor:pointer;
+  }
+  .btn:hover{ background:var(--cash); }
+  .btn:focus-visible{ outline:2px solid var(--cash-bright); outline-offset:2px; }
+  .btn.small{ padding:7px 12px; font-size:11px; }
+
+  /* ===================== DEBT LINE ITEMS ===================== */
+  .debt-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px dotted var(--line);
+  }
+  .debt-item:last-child{ border-bottom:none; }
+
+  input[type=checkbox].punch{
+    appearance:none; -webkit-appearance:none;
+    width:21px; height:21px;
+    border-radius:50%;
+    border:2px solid var(--ink-soft);
+    background:var(--paper);
+    cursor:pointer;
+    position:relative;
+    flex-shrink:0;
+  }
+  input[type=checkbox].punch:checked{
+    border-color:var(--cash);
+    background:var(--cash);
+  }
+  input[type=checkbox].punch:checked::after{
+    content:"✓";
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--paper);
+    font-size:12px; font-weight:700;
+  }
+  input[type=checkbox].punch:focus-visible{
+    outline:2px solid var(--cash-bright);
+    outline-offset:2px;
+  }
+
+  .debt-item .name-row{
+    flex:1;
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+    min-width:0;
+    overflow:hidden;
+  }
+  .debt-item .name{
+    font-weight:600;
+    font-size:13.5px;
+    white-space:nowrap;
+  }
+  .debt-item .name.paid{ text-decoration:line-through; color:var(--ink-faint); }
+  .debt-item .leader{
+    flex:1;
+    border-bottom:1px dotted var(--ink-faint);
+    height:0;
+    min-width:10px;
+    position:relative;
+    top:-4px;
+  }
+  .debt-item .cat{
+    display:block;
+    font-size:10px;
+    color:var(--ink-faint);
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    margin-top:1px;
+  }
+  .debt-item .val{
+    font-weight:700;
+    white-space:nowrap;
+    font-size:13.5px;
+  }
+  .debt-item .val.paid{ color:var(--ink-faint); text-decoration:line-through; }
+  .debt-item .del{
+    background:none;border:none;color:var(--ink-faint);
+    cursor:pointer; font-size:15px; padding:2px 4px;
+    flex-shrink:0;
+  }
+  .debt-item .del:hover{ color:var(--stamp); }
+  .empty-state{
+    color:var(--ink-soft);
+    font-size:12.5px;
+    padding:18px 0;
+    text-align:center;
+    font-style:italic;
+  }
+
+  /* ===================== IMPORT ===================== */
+  .import-box{
+    margin-top:6px;
+    padding:14px;
+    border:1px dashed var(--ink-faint);
+  }
+  .import-box h3{
+    font-size:12px;
+    margin:0 0 6px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    font-family:'Courier Prime',monospace;
+  }
+  .import-box p{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin:0 0 12px;
+    line-height:1.55;
+  }
+  .import-box code{
+    background:var(--paper-2);
+    padding:1px 5px;
+    border-radius:3px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+  }
+  input[type=file]{ font-size:11.5px; color:var(--ink-soft); }
+  .import-msg{
+    margin-top:10px;
+    font-size:11.5px;
+    padding:8px 10px;
+    display:none;
+    border-left:3px solid transparent;
+  }
+  .import-msg.ok{ display:block; background:rgba(31,111,73,0.1); border-color:var(--cash); color:#184f36; }
+  .import-msg.warn{ display:block; background:rgba(176,131,51,0.12); border-color:var(--gold); color:#7a5c22; }
+  .import-msg.err{ display:block; background:rgba(165,57,58,0.1); border-color:var(--stamp); color:#7a2b2c; }
+
+  /* ===================== GOALS (coupons) ===================== */
+  .goal-card{
+    position:relative;
+    background:var(--paper-2);
+    border:1px dashed var(--ink-faint);
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .goal-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:9px;
+  }
+  .goal-head .name{
+    font-family:'Courier Prime',monospace;
+    font-weight:700;
+    font-size:14.5px;
+  }
+  .goal-head .del{
+    background:none;border:none;color:var(--ink-faint);
+    cursor:pointer; font-size:14px;
+  }
+  .goal-head .del:hover{ color:var(--stamp); }
+  .goal-nums{
+    display:flex;
+    justify-content:space-between;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .goal-track{
+    height:12px;
+    background:var(--paper);
+    border:1px solid var(--paper-3);
+    overflow:hidden;
+  }
+  .goal-fill{
+    height:100%;
+    background:var(--gold);
+    transition:width .4s ease;
+  }
+  .goal-pct{
+    text-align:right;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    margin-top:4px;
+  }
+  .goal-add{
+    display:flex;
+    gap:8px;
+    margin-top:11px;
+  }
+  .goal-add input{ flex:1; }
+  .goal-done{ color:var(--cash); font-weight:700; }
+  .goal-stamp{
+    position:absolute;
+    top:8px; right:12px;
+    border:2px double var(--gold);
+    color:var(--gold);
+    font-family:'Courier Prime',monospace;
+    font-weight:700;
+    font-size:10px;
+    letter-spacing:.08em;
+    padding:2px 7px;
+    transform:rotate(6deg);
+    opacity:0.9;
+    mix-blend-mode:multiply;
+  }
+
+  /* ===================== CALCULATOR (adding machine) ===================== */
+  .calc-wrap{ max-width:320px; margin:0 auto; }
+  .calc-tape{
+    background:var(--paper);
+    border:1px solid var(--paper-3);
+    padding:16px 14px 14px;
+    text-align:right;
+    margin-bottom:4px;
+  }
+  .calc-tape-tear{
+    height:9px;
+    background-image:
+      linear-gradient(135deg, var(--paper) 50%, transparent 50.5%),
+      linear-gradient(45deg, var(--paper) 50%, transparent 50.5%);
+    background-size:12px 12px;
+    background-position:0 0, 6px 0;
+    background-repeat:repeat-x;
+    margin-bottom:12px;
+  }
+  .calc-mem{
+    font-size:10.5px; color:var(--ink-soft);
+    min-height:13px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .calc-val{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:30px;
+    font-weight:700;
+    word-break:break-all;
+  }
+  .calc-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:7px;
+    margin-top:12px;
+  }
+  .calc-grid button{
+    padding:15px 0;
+    border:1px solid var(--paper-3);
+    background:var(--paper-2);
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    border-radius:3px;
+  }
+  .calc-grid button:hover{ background:var(--paper-3); }
+  .calc-grid button:focus-visible{ outline:2px solid var(--cash-bright); outline-offset:1px; }
+  .calc-grid button.op{ color:var(--gold); background:var(--paper-3); }
+  .calc-grid button.mem{ color:var(--cash); font-size:11px; font-family:'Inter',sans-serif; font-weight:700; }
+  .calc-grid button.eq{ background:var(--cash); color:var(--paper); border-color:var(--cash); }
+  .calc-grid button.eq:hover{ background:var(--cash-bright); }
+  .calc-grid button.clear{ background:var(--stamp); color:var(--paper); border-color:var(--stamp); }
+  .calc-grid button.clear:hover{ opacity:0.9; }
+  .calc-grid button.wide{ grid-column:span 2; }
+
+  .receipt-foot{
+    text-align:center;
+    color:var(--ink-faint);
+    font-size:10.5px;
+    padding-top:18px;
+    font-family:'Courier Prime',monospace;
+    letter-spacing:.03em;
+  }
+
+  @media (max-width:480px){
+    .add-form{ grid-template-columns:1fr; }
+    .receipt-head{ flex-direction:column; }
+    .meta-block{ text-align:left; }
+    .barcode{ justify-content:flex-start; }
+    .calc-grid button{ padding:13px 0; font-size:14px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="authGate" style="max-width:420px;margin:60px auto;background:var(--paper);padding:26px 24px;border:1px solid var(--paper-3);box-shadow:0 18px 34px rgba(0,0,0,0.5);">
+  <h1 class="type" style="margin:0 0 4px;font-size:22px;">ZERADO</h1>
+  <p style="color:var(--ink-soft);font-size:13px;margin:0 0 20px;">Seus dados ficam guardados numa planilha do Google — assim você acessa do celular e do computador com os mesmos números.</p>
+
+  <div id="authStep">
+    <button class="btn" style="width:100%;" onclick="connectGoogle()">Entrar com Google</button>
+    <div id="authError" style="display:none;margin-top:10px;font-size:12px;color:var(--stamp);"></div>
+  </div>
+
+  <div id="sheetStep" style="display:none;">
+    <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 10px;">Cole o ID de uma planilha que você já usou neste app em outro aparelho, ou crie uma nova agora.</p>
+    <label class="field-label">ID da planilha</label>
+    <input id="sheetIdInput" type="text" placeholder="cole aqui o ID da planilha" style="margin-bottom:10px;">
+    <button class="btn" style="width:100%;margin-bottom:10px;" onclick="useExistingSheet()">Usar esta planilha</button>
+    <div style="text-align:center;font-size:11px;color:var(--ink-faint);margin:8px 0;">— ou —</div>
+    <button class="btn small" id="createSheetBtn" style="width:100%;background:var(--paper-2);color:var(--ink);border:1px solid var(--paper-3);" onclick="createNewSheet()">+ criar nova planilha</button>
+  </div>
+</div>
+
+<div id="appShell" style="display:none;">
+<div class="receipt-shell">
+  <div class="torn top"></div>
+  <div class="receipt-body">
+
+    <div class="receipt-head">
+      <div class="brand">
+        <h1 class="type">ZERADO</h1>
+        <div class="tag">controle de dívidas &amp; metas — só no seu navegador</div>
+      </div>
+      <div class="meta-block">
+        <div class="barcode" id="barcode"></div>
+        <div id="receiptMeta" class="mono"></div>
+        <div id="syncStatus" style="font-size:10px;margin-top:3px;"></div>
+      </div>
+    </div>
+
+    <div class="phrase-strip">
+      <p id="phraseText">Carregando...</p>
+      <button class="phrase-refresh" onclick="newPhrase()">tirar outra senha →</button>
+    </div>
+
+    <nav class="tabs">
+      <button class="active" data-view="dividas" onclick="switchTab('dividas')">Dívidas</button>
+      <button data-view="metas" onclick="switchTab('metas')">Metas</button>
+      <button data-view="calculadora" onclick="switchTab('calculadora')">Calc.</button>
+    </nav>
+
+    <div class="panel">
+
+      <!-- ================= DÍVIDAS ================= -->
+      <section id="view-dividas" class="view active">
+        <h2 class="section-title">Saldo devedor</h2>
+        <p class="section-sub">Marque o círculo quando uma dívida for paga — ela sai da conta.</p>
+
+        <div class="ruler-wrap">
+          <div class="stamp" id="paidStamp">QUITADO ✓</div>
+          <div class="ruler-total">
+            <span class="label">Falta pagar</span>
+            <span class="value mono" id="totalDebtValue">R$ 0,00</span>
+          </div>
+          <div class="ruler-track" id="rulerTrack"></div>
+          <div class="ruler-caption">
+            <span id="rulerPaidCaption">R$ 0,00 já quitado</span>
+            <span id="rulerTotalCaption">de R$ 0,00 no total</span>
+          </div>
+        </div>
+
+        <div class="add-form">
+          <div>
+            <label class="field-label">Descrição</label>
+            <input id="debtName" type="text" placeholder="Ex: fatura do cartão">
+          </div>
+          <div>
+            <label class="field-label">Valor (R$)</label>
+            <input id="debtValue" type="text" inputmode="decimal" placeholder="150,00">
+          </div>
+          <div>
+            <label class="field-label">Categoria</label>
+            <select id="debtCategory" onchange="toggleCustomCategory()">
+              <option value="Contas">Contas</option>
+              <option value="Cartão de Crédito">Cartão de crédito</option>
+              <option value="Dívidas Pessoais">Dívidas pessoais (empréstimos)</option>
+              <option value="Personalizado">Personalizado</option>
+            </select>
+          </div>
+          <div id="customCategoryWrap" style="display:none;">
+            <label class="field-label">Nome da categoria</label>
+            <input id="debtCustomCategory" type="text" placeholder="Ex: viagem, saúde...">
+          </div>
+          <div class="full">
+            <button class="btn" onclick="addDebt()">+ lançar dívida</button>
+          </div>
+        </div>
+
+        <div id="debtList"></div>
+
+        <div class="perf"></div>
+
+        <div class="import-box">
+          <h3>Importar de arquivo</h3>
+          <p>
+            <strong>.txt:</strong> uma dívida por linha, formato <code>nome;valor;categoria</code> (categoria opcional).<br>
+            <strong>.xlsx:</strong> colunas fixas na 1ª linha: <code>Descrição</code>, <code>Valor</code>, <code>Categoria</code>.<br>
+            Linha fora do formato é pulada e avisada no final — nada é adivinhado.
+          </p>
+          <input type="file" id="fileInput" accept=".txt,.xlsx,.xls" onchange="handleFile(event)">
+          <div class="import-msg" id="importMsg"></div>
+        </div>
+      </section>
+
+      <!-- ================= METAS ================= -->
+      <section id="view-metas" class="view">
+        <h2 class="section-title">Cupons de meta</h2>
+        <p class="section-sub">Crie quantas metas quiser e vá somando o que já guardou.</p>
+
+        <div class="add-form">
+          <div>
+            <label class="field-label">Nome da meta</label>
+            <input id="goalName" type="text" placeholder="Ex: bola nova">
+          </div>
+          <div>
+            <label class="field-label">Valor da meta (R$)</label>
+            <input id="goalTarget" type="text" inputmode="decimal" placeholder="150,00">
+          </div>
+          <div class="full">
+            <button class="btn" onclick="addGoal()">+ criar meta</button>
+          </div>
+        </div>
+
+        <div id="goalList"></div>
+      </section>
+
+      <!-- ================= CALCULADORA ================= -->
+      <section id="view-calculadora" class="view">
+        <h2 class="section-title">Calculadora</h2>
+        <p class="section-sub">Aritmética completa, porcentagem e memória.</p>
+
+        <div class="calc-wrap">
+          <div class="calc-tape">
+            <div class="calc-mem" id="calcMem">&nbsp;</div>
+            <div class="calc-val" id="calcVal">0</div>
+          </div>
+          <div class="calc-tape-tear"></div>
+          <div class="calc-grid">
+            <button class="mem" onclick="calcMemory('MC')">MC</button>
+            <button class="mem" onclick="calcMemory('MR')">MR</button>
+            <button class="mem" onclick="calcMemory('M-')">M-</button>
+            <button class="mem" onclick="calcMemory('M+')">M+</button>
+
+            <button class="clear" onclick="calcClear()">C</button>
+            <button class="op" onclick="calcInput('back')">⌫</button>
+            <button class="op" onclick="calcInput('%')">%</button>
+            <button class="op" onclick="calcInput('÷')">÷</button>
+
+            <button onclick="calcInput('7')">7</button>
+            <button onclick="calcInput('8')">8</button>
+            <button onclick="calcInput('9')">9</button>
+            <button class="op" onclick="calcInput('×')">×</button>
+
+            <button onclick="calcInput('4')">4</button>
+            <button onclick="calcInput('5')">5</button>
+            <button onclick="calcInput('6')">6</button>
+            <button class="op" onclick="calcInput('-')">−</button>
+
+            <button onclick="calcInput('1')">1</button>
+            <button onclick="calcInput('2')">2</button>
+            <button onclick="calcInput('3')">3</button>
+            <button class="op" onclick="calcInput('+')">+</button>
+
+            <button class="wide" onclick="calcInput('0')">0</button>
+            <button onclick="calcInput('.')">,</button>
+            <button class="eq" onclick="calcInput('=')">=</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="perf"></div>
+    <div class="receipt-foot">*** dados guardados na sua planilha do Google (<span id="sheetIdLabel" class="mono"></span>) ***<br><button class="phrase-refresh" style="margin-top:6px;" onclick="forgetSheet()">trocar de planilha / conta →</button></div>
+  </div>
+  <div class="torn bottom"></div>
+</div>
+</div>
+
+<script>
+/* ============ FRASES MOTIVACIONAIS ============ */
+const PHRASES = [
+"Cada real que sobra é uma dívida a menos amanhã.",
+"Você não está pobre, está no meio do caminho para ficar livre.",
+"Gastar por impulso é pagar juros de uma decisão que durou cinco segundos.",
+"Quem controla o próprio dinheiro controla o próprio tempo.",
+"A dívida encolhe do mesmo jeito que cresceu: pouco a pouco.",
+"Todo mês que você não usa o cartão é um mês que o cartão não usa você.",
+"Riqueza começa com a diferença entre o que você ganha e o que você gasta.",
+"Não é sobre ganhar mais, é sobre vazar menos.",
+"A parcela que você não assume hoje é a liberdade que você compra amanhã.",
+"Dinheiro guardado não rende juros de arrependimento.",
+"Se dói pagar à vista, provavelmente não cabe no orçamento.",
+"Organize hoje o que o susto de amanhã vai cobrar em dobro.",
+"Sua meta não se importa com a sua pressa, só com a sua constância.",
+"Cada dívida quitada é um peso que sai da mochila.",
+"O juro composto trabalha contra você até o dia em que passa a trabalhar a favor.",
+"Comparar sua vida financeira com a dos outros é o jeito mais caro de se sentir pobre.",
+"Um orçamento não é uma prisão, é um mapa.",
+"Você não precisa ficar rico rápido, precisa parar de ficar mais pobre devagar.",
+"Toda reserva de emergência começa com uma nota que você decidiu não gastar.",
+"O luxo mais raro hoje em dia é dever zero.",
+"Quem anota gasto pequeno não é levado de surpresa pelo gasto grande.",
+"A régua da dívida só desce quando você decide que ela desce.",
+"Cada check marcado é uma prova de que você cumpre o que promete a si mesmo.",
+"Economizar não é privação, é adiar o prazer com juros a seu favor.",
+"O cartão de crédito não é renda, é um empréstimo com prazo curto.",
+"Ninguém enriquece parcelando o supérfluo em doze vezes.",
+"Sua meta de R$150 hoje é o treino para a meta de R$15.000 de amanhã.",
+"O dinheiro que você não vê sair é o único que realmente sobra.",
+"Ter uma dívida não te define, manter ela para sempre é que seria escolha sua.",
+"Pequenas renúncias de hoje compram grandes liberdades de amanhã.",
+"Cada real na meta é um degrau, não um detalhe.",
+"O primeiro passo para sair do vermelho é olhar pra ele sem medo.",
+"Disciplina financeira não é sobre nunca gastar, é sobre gastar com intenção.",
+"Quem paga a fatura cheia todo mês nunca soube o que é pagar juros do cartão.",
+"O melhor investimento do mês pode ser simplesmente não se endividar mais.",
+"Sonhos com prazo viram metas; metas sem prazo viram sonhos parados.",
+"Cada boleto quitado é uma vitória que ninguém aplaude, mas você sente.",
+"O hábito de guardar dinheiro é mais forte que a vontade de gastar.",
+"Você não controla o preço das coisas, mas controla a hora de comprar.",
+"Uma meta clara transforma vontade em plano.",
+"O dinheiro que sobra no fim do mês é o dinheiro que você decidiu proteger antes.",
+"Não é o valor que guarda, é o hábito de guardar que constrói o futuro.",
+"Cada categoria organizada é um pouco menos de caos na sua cabeça.",
+"Sair do vermelho é uma maratona, não uma corrida de cem metros.",
+"O que parece pequeno hoje — vinte reais — é gigante multiplicado por doze meses.",
+"Você não está atrasado, está no seu próprio ritmo de recomeço.",
+"A liberdade financeira começa no dia em que a dívida para de ser prioridade nº1.",
+"Gastar menos do que se ganha é a regra mais simples e mais ignorada do dinheiro.",
+"Nenhuma promoção é boa se você não tinha planejado aquele gasto.",
+"Cada aporte na meta é um voto de confiança no seu próprio futuro.",
+"Quem tem plano B financeiro dorme melhor mesmo em mês ruim.",
+"O juro do cartão não olha pra sua boa intenção, só pro seu saldo devedor.",
+"Toda dívida tem uma data de nascimento e pode ter uma data de morte.",
+"Você já economizou hoje só de não ter comprado por impulso.",
+"Riqueza silenciosa é aquela que ninguém vê, só quem a construiu sente.",
+"Uma reserva guardada vale mais que um limite de crédito alto.",
+"O controle começa na anotação, não na intenção.",
+"Cortar um gasto pequeno todo dia é mais fácil que cortar um gasto grande uma vez só.",
+"Quem entende o próprio extrato entende o próprio comportamento.",
+"A meta bate quando a constância bate antes.",
+"Cada mês sem dívida nova é um mês de terreno reconquistado.",
+"O dinheiro não compra felicidade, mas paga boleto, e isso já ajuda muito.",
+"Trocar conforto imediato por segurança futura é a essência de poupar.",
+"Você não precisa de motivação todo dia, precisa de um sistema que funcione sem ela.",
+"O saldo da conta reflete decisões, não sorte.",
+"Cada dívida marcada como paga é um capítulo fechado.",
+"Investir em si mesmo também é decidir não gastar à toa.",
+"A régua da dívida desce mais rápido quando você para de alimentá-la.",
+"Falar sobre dinheiro sem vergonha é o primeiro passo pra organizá-lo.",
+"O hábito de revisar os gastos vale mais que qualquer planilha bonita.",
+"Você não é o que deve, você é o que decide fazer a partir de hoje.",
+"Uma meta com valor definido é mais fácil de perseguir que um desejo vago.",
+"Cada real guardado é um tijolo na parede da sua segurança.",
+"O improviso financeiro custa caro; o planejamento custa disciplina.",
+"Ninguém fica rico copiando o consumo de quem parece rico.",
+"O primeiro mês de controle é o mais difícil; o resto é hábito.",
+"Cada categoria de dívida organizada é um problema menor pela metade.",
+"O dinheiro trabalha pra quem entende pra onde ele está indo.",
+"Uma vida financeira organizada começa numa lista simples, não numa fórmula complexa.",
+"Você já venceu hoje se gastou menos do que planejou.",
+"A pressa de comprar agora custa caro depois, em parcela e em juro.",
+"O maior inimigo do orçamento é o \"só dessa vez\".",
+"Cada meta batida prova que a próxima também é possível.",
+"Ter noção do total devido é metade do caminho pra zerar ele.",
+"Guardar dinheiro é um ato de respeito com o seu eu do futuro.",
+"O conforto de hoje parcelado é o aperto de amanhã à vista.",
+"Quem organiza a dívida por categoria enxerga o problema real, não o boato dele.",
+"Cada boleto pago em dia é um juro que você nunca vai conhecer.",
+"A meta não julga o tamanho do aporte, só reconhece que ele existe.",
+"Seu bolso agradece toda vez que você espera 24 horas antes de comprar.",
+"Não existe dívida pequena demais para ser ignorada.",
+"O planejamento financeiro é o único orçamento que rende juro de tranquilidade.",
+"Cada real a menos gasto hoje é um real a mais livre amanhã.",
+"Reserva de emergência é o colchão que você não vê até precisar dele.",
+"Quem revisa a fatura entende os próprios hábitos antes que eles virem problema.",
+"O hábito de poupar pequeno é o que sustenta a meta grande.",
+"Você não precisa ser perfeito com dinheiro, precisa ser consistente.",
+"Um mês difícil não apaga três meses de disciplina.",
+"Cada dívida paga é um argumento a menos para o estresse financeiro.",
+"O total da régua é só um número até você decidir que ele vai baixar.",
+"Investir tempo organizando as contas rende mais do que parece.",
+"Nenhuma meta é boba quando ela te ensina a esperar e guardar.",
+"Cada centavo tem destino quando você decide onde ele vai antes de gastar.",
+"O maior luxo é abrir o extrato sem sentir aperto no peito.",
+"Você está construindo o hábito, o valor guardado é só o efeito colateral bom.",
+"Um planejamento simples vencido todo mês supera um plano perfeito nunca seguido.",
+"A dívida de hoje é o preço de uma decisão de ontem — e você pode decidir diferente agora.",
+"Cada aporte na meta é menor que o arrependimento de não ter guardado nada.",
+"O dinheiro parado na meta está mais seguro que qualquer promoção tentadora.",
+"Você não fica rico de uma vez, fica rico todo dia um pouco.",
+"A régua de dívida é só o espelho do seu comportamento — e comportamento muda.",
+"Cada real na meta hoje é menos dependência de crédito amanhã.",
+"O controle financeiro começa no momento em que você para de fingir que não vai olhar o extrato.",
+"Uma meta pequena batida ensina a bater uma meta grande.",
+"Cortar gasto supérfluo não é sacrifício, é prioridade escolhida.",
+"O hábito de poupar antes de gastar inverte o jogo a seu favor.",
+"Cada dívida organizada por categoria é um mistério a menos na sua cabeça.",
+"O melhor presente que você pode se dar é sair do vermelho.",
+"Você não precisa de sorte para guardar dinheiro, precisa de rotina.",
+"Uma meta com prazo vira decisão diária, não promessa de ano novo.",
+"O primeiro real guardado é sempre o mais difícil — o resto fica mais fácil.",
+"Cada gasto adiado por um dia já é uma vitória sobre o impulso.",
+"O dinheiro que sobra quando você paga a si mesmo primeiro é o que constrói patrimônio.",
+"Você não está sozinho na dívida, mas só você decide sair dela.",
+"Cada categoria de despesa clara é um orçamento mais fácil de seguir.",
+"O juro que você não paga é o lucro mais garantido que existe.",
+"Reduzir uma dívida por mês já muda o próximo ano inteiro.",
+"O hábito vence a motivação todos os dias da semana.",
+"Cada aporte, por menor que seja, empurra a barra da meta pra frente.",
+"Dinheiro organizado é menos ansiedade guardada."
+];
+let phraseIdx = -1;
+function newPhrase(){
+  let i;
+  do { i = Math.floor(Math.random()*PHRASES.length); } while(i===phraseIdx && PHRASES.length>1);
+  phraseIdx = i;
+  document.getElementById('phraseText').textContent = PHRASES[i];
+}
+
+/* ============ RECEIPT HEADER DECOR ============ */
+function renderBarcode(){
+  const box = document.getElementById('barcode');
+  let bars = '';
+  for(let i=0;i<26;i++){
+    const w = [1,1,2,1,3][Math.floor(Math.random()*5)];
+    const h = 14 + Math.floor(Math.random()*12);
+    bars += `<span style="width:${w}px;height:${h}px"></span>`;
+  }
+  box.innerHTML = bars;
+}
+function renderReceiptMeta(){
+  const now = new Date();
+  const date = now.toLocaleDateString('pt-BR');
+  const time = now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('receiptMeta').innerHTML = `RECIBO Nº 0001<br>${date} ${time}`;
+}
+
+/* ============ GOOGLE SHEETS COMO BANCO DE DADOS ============ */
+// 1) Troque pelo Client ID que você criar no Google Cloud Console (OAuth 2.0 - app da Web).
+// 2) Publique este arquivo num endereço https (ex: GitHub Pages) e cadastre esse endereço
+//    como "Origem JavaScript autorizada" na credencial do Google.
+const GOOGLE_CLIENT_ID = "420831351603-i8f6or1qvi0tl4c3r319pahpkk615v8c.apps.googleusercontent.com";
+const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+
+let debtsCache = [];
+let goalsCache = [];
+let gapiToken = null;
+let tokenClient = null;
+
+function setSyncStatus(state){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(state==='saving'){ el.textContent = 'salvando na planilha…'; el.style.color = 'var(--ink-soft)'; }
+  else if(state==='ok'){ el.textContent = 'sincronizado com o Sheets ✓'; el.style.color = 'var(--cash)'; }
+  else if(state==='err'){ el.textContent = 'erro ao sincronizar com o Sheets'; el.style.color = 'var(--stamp)'; }
+  else if(state==='loading'){ el.textContent = 'carregando da planilha…'; el.style.color = 'var(--ink-soft)'; }
+}
+
+function getSheetId(){ return localStorage.getItem('zerado_sheet_id') || ''; }
+function setSheetId(id){ localStorage.setItem('zerado_sheet_id', id); }
+
+function initGis(){
+  if(!window.google || !google.accounts){
+    document.getElementById('authError').textContent = 'Não consegui carregar o login do Google. Verifique sua internet e recarregue a página.';
+    document.getElementById('authError').style.display='block';
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SHEETS_SCOPE,
+    callback: ''
+  });
+}
+
+function requestToken(interactive){
+  return new Promise((resolve, reject)=>{
+    if(!tokenClient){ reject(new Error('Google ainda não carregou.')); return; }
+    tokenClient.callback = (resp)=>{
+      if(resp.error){ reject(resp); return; }
+      gapiToken = resp.access_token;
+      resolve(gapiToken);
+    };
+    tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+  });
+}
+
+async function sheetsFetch(path, options={}, retried){
+  if(!gapiToken) await requestToken(true);
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${path}`, {
+    ...options,
+    headers:{
+      'Authorization': `Bearer ${gapiToken}`,
+      'Content-Type': 'application/json',
+      ...(options.headers||{})
+    }
+  });
+  if(res.status===401 && !retried){
+    gapiToken = null;
+    await requestToken(false);
+    return sheetsFetch(path, options, true);
+  }
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error('Erro na API do Sheets: '+t);
+  }
+  return res.status===204 ? {} : res.json();
+}
+
+async function readRange(sheetId, range){
+  const data = await sheetsFetch(`${sheetId}/values/${encodeURIComponent(range)}`);
+  return data.values || [];
+}
+async function writeRange(sheetId, range, values){
+  await sheetsFetch(`${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+    method:'PUT',
+    body: JSON.stringify({values})
+  });
+}
+async function clearRange(sheetId, range){
+  await sheetsFetch(`${sheetId}/values/${encodeURIComponent(range)}:clear`, { method:'POST', body:'{}' });
+}
+
+async function createSpreadsheet(){
+  const body = {
+    properties:{ title:'Zerado — dados' },
+    sheets:[ {properties:{title:'Dividas'}}, {properties:{title:'Metas'}} ]
+  };
+  const data = await sheetsFetch('', { method:'POST', body: JSON.stringify(body) });
+  await writeRange(data.spreadsheetId, 'Dividas!A1:E1', [['id','nome','valor','categoria','pago']]);
+  await writeRange(data.spreadsheetId, 'Metas!A1:D1', [['id','nome','meta','guardado']]);
+  return data.spreadsheetId;
+}
+
+async function loadAll(){
+  setSyncStatus('loading');
+  const sheetId = getSheetId();
+  try{
+    const debtRows = await readRange(sheetId, 'Dividas!A2:E100000');
+    debtsCache = debtRows.filter(r=>r[0]).map(r=>({
+      id:r[0], name:r[1]||'', value:parseFloat(String(r[2]).replace(',','.'))||0,
+      category:r[3]||'Personalizado', paid: r[4]==='1' || r[4]===1 || r[4]===true || String(r[4]).toUpperCase()==='TRUE'
+    }));
+    const goalRows = await readRange(sheetId, 'Metas!A2:D100000');
+    goalsCache = goalRows.filter(r=>r[0]).map(r=>({
+      id:r[0], name:r[1]||'', target:parseFloat(String(r[2]).replace(',','.'))||0, saved:parseFloat(String(r[3]).replace(',','.'))||0
+    }));
+    setSyncStatus('ok');
+  }catch(err){
+    console.error(err);
+    debtsCache = []; goalsCache = [];
+    setSyncStatus('err');
+  }
+}
+
+async function persistDebts(){
+  setSyncStatus('saving');
+  try{
+    const sheetId = getSheetId();
+    await clearRange(sheetId, 'Dividas!A2:E100000');
+    if(debtsCache.length>0){
+      const rows = debtsCache.map(d=>[d.id, d.name, d.value, d.category, d.paid ? 1 : 0]);
+      await writeRange(sheetId, 'Dividas!A2', rows);
+    }
+    setSyncStatus('ok');
+  }catch(err){ console.error(err); setSyncStatus('err'); }
+}
+
+async function persistGoals(){
+  setSyncStatus('saving');
+  try{
+    const sheetId = getSheetId();
+    await clearRange(sheetId, 'Metas!A2:D100000');
+    if(goalsCache.length>0){
+      const rows = goalsCache.map(g=>[g.id, g.name, g.target, g.saved]);
+      await writeRange(sheetId, 'Metas!A2', rows);
+    }
+    setSyncStatus('ok');
+  }catch(err){ console.error(err); setSyncStatus('err'); }
+}
+
+/* ============ TELA DE CONEXÃO ============ */
+async function connectGoogle(){
+  document.getElementById('authError').style.display='none';
+  try{
+    await requestToken(true);
+    showSheetStep();
+  }catch(err){
+    document.getElementById('authError').textContent = 'Login cancelado ou recusado. Tente de novo.';
+    document.getElementById('authError').style.display='block';
+  }
+}
+
+function showSheetStep(){
+  document.getElementById('authStep').style.display='none';
+  document.getElementById('sheetStep').style.display='block';
+}
+
+async function useExistingSheet(){
+  const input = document.getElementById('sheetIdInput');
+  const id = input.value.trim();
+  if(!id){ alert('Cole o ID da planilha.'); return; }
+  setSheetId(id);
+  await bootApp();
+}
+
+async function createNewSheet(){
+  const btn = document.getElementById('createSheetBtn');
+  btn.disabled = true; btn.textContent = 'criando…';
+  try{
+    const id = await createSpreadsheet();
+    setSheetId(id);
+    await bootApp();
+  }catch(err){
+    console.error(err);
+    alert('Não consegui criar a planilha. Confira se a API do Google Sheets está ativada no seu projeto.');
+  }
+  btn.disabled = false; btn.textContent = '+ criar nova planilha';
+}
+
+function forgetSheet(){
+  localStorage.removeItem('zerado_sheet_id');
+  location.reload();
+}
+
+async function bootApp(){
+  document.getElementById('authGate').style.display='none';
+  document.getElementById('appShell').style.display='block';
+  const sid = getSheetId();
+  document.getElementById('sheetIdLabel').textContent = sid;
+  await loadAll();
+  renderDebts();
+  renderGoals();
+}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function parseValueBR(str){
+  if(!str) return NaN;
+  let s = String(str).trim().replace(/R\$\s?/i,'').replace(/\s/g,'');
+  if(s.includes(',') && s.includes('.')){
+    s = s.replace(/\./g,'').replace(',', '.');
+  } else if(s.includes(',')){
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+function formatBRL(n){
+  return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+/* ============ TABS ============ */
+function switchTab(view){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+view));
+}
+
+/* ============ DÍVIDAS ============ */
+function toggleCustomCategory(){
+  const sel = document.getElementById('debtCategory').value;
+  document.getElementById('customCategoryWrap').style.display = (sel==='Personalizado') ? 'block' : 'none';
+}
+
+async function addDebt(){
+  const nameEl = document.getElementById('debtName');
+  const valEl = document.getElementById('debtValue');
+  const catEl = document.getElementById('debtCategory');
+  const customEl = document.getElementById('debtCustomCategory');
+
+  const name = nameEl.value.trim();
+  const value = parseValueBR(valEl.value);
+  let category = catEl.value;
+  if(category==='Personalizado' && customEl.value.trim()){
+    category = customEl.value.trim();
+  }
+
+  if(!name || isNaN(value) || value<=0){
+    alert('Preencha nome e um valor válido maior que zero.');
+    return;
+  }
+
+  debtsCache.push({id:uid(), name, value, category, paid:false});
+  renderDebts();
+  nameEl.value=''; valEl.value=''; customEl.value='';
+  await persistDebts();
+}
+
+async function togglePaid(id){
+  const d = debtsCache.find(x=>x.id===id);
+  if(d) d.paid = !d.paid;
+  renderDebts();
+  await persistDebts();
+}
+
+async function deleteDebt(id){
+  debtsCache = debtsCache.filter(x=>x.id!==id);
+  renderDebts();
+  await persistDebts();
+}
+
+function renderDebts(){
+  const debts = debtsCache;
+  const list = document.getElementById('debtList');
+
+  if(debts.length===0){
+    list.innerHTML = '<div class="empty-state">— nenhuma dívida lançada ainda —</div>';
+  } else {
+    list.innerHTML = debts.map(d => `
+      <div class="debt-item">
+        <input type="checkbox" class="punch" ${d.paid?'checked':''} onchange="togglePaid('${d.id}')">
+        <div class="name-row">
+          <span class="name ${d.paid?'paid':''}">${escapeHtml(d.name)}</span>
+          <span class="leader"></span>
+        </div>
+        <div style="text-align:right;">
+          <div class="val ${d.paid?'paid':''} mono">${formatBRL(d.value)}</div>
+          <span class="cat">${escapeHtml(d.category)}</span>
+        </div>
+        <button class="del" onclick="deleteDebt('${d.id}')" title="Excluir">✕</button>
+      </div>
+    `).join('');
+  }
+
+  const total = debts.reduce((s,d)=>s+d.value,0);
+  const remaining = debts.filter(d=>!d.paid).reduce((s,d)=>s+d.value,0);
+  const paidSum = total - remaining;
+  const pct = total>0 ? (remaining/total*100) : 0;
+
+  document.getElementById('totalDebtValue').textContent = formatBRL(remaining);
+  document.getElementById('totalDebtValue').classList.toggle('zero', remaining===0);
+  document.getElementById('rulerPaidCaption').textContent = formatBRL(paidSum)+' já quitado';
+  document.getElementById('rulerTotalCaption').textContent = 'de '+formatBRL(total)+' no total';
+
+  const filledSegs = Math.round((pct/100)*20);
+  const track = document.getElementById('rulerTrack');
+  track.innerHTML = Array.from({length:20}).map((_,i)=>`<span class="seg ${i<filledSegs?'filled':''}"></span>`).join('');
+
+  const stamp = document.getElementById('paidStamp');
+  if(total>0 && remaining===0){
+    stamp.classList.add('show');
+  } else {
+    stamp.classList.remove('show');
+  }
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ============ IMPORTAÇÃO ============ */
+function handleFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const msgBox = document.getElementById('importMsg');
+  msgBox.className = 'import-msg';
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if(ext==='txt'){
+    const reader = new FileReader();
+    reader.onload = e => {
+      const lines = e.target.result.split(/\r?\n/).filter(l=>l.trim().length>0);
+      importLines(lines);
+    };
+    reader.readAsText(file, 'UTF-8');
+  } else if(ext==='xlsx' || ext==='xls'){
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+        importRows(rows);
+      } catch(err){
+        msgBox.className = 'import-msg err';
+        msgBox.textContent = 'Não consegui ler esse arquivo Excel. Confira se ele não está corrompido.';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    msgBox.className = 'import-msg err';
+    msgBox.textContent = 'Formato não suportado. Use .txt ou .xlsx.';
+  }
+  evt.target.value = '';
+}
+
+async function importLines(lines){
+  let added=0, skipped=0;
+  lines.forEach(line=>{
+    const parts = line.split(';').map(p=>p.trim());
+    const name = parts[0];
+    const value = parseValueBR(parts[1]);
+    const category = parts[2] && parts[2].length>0 ? parts[2] : 'Personalizado';
+    if(!name || isNaN(value) || value<=0){ skipped++; return; }
+    debtsCache.push({id:uid(), name, value, category, paid:false});
+    added++;
+  });
+  renderDebts();
+  showImportResult(added, skipped);
+  await persistDebts();
+}
+
+async function importRows(rows){
+  let added=0, skipped=0;
+  rows.forEach(row=>{
+    const name = (row['Descrição'] ?? row['Descricao'] ?? row['descrição'] ?? '').toString().trim();
+    const rawVal = row['Valor'] ?? row['valor'];
+    const value = typeof rawVal === 'number' ? rawVal : parseValueBR(rawVal);
+    const category = (row['Categoria'] ?? row['categoria'] ?? '').toString().trim() || 'Personalizado';
+    if(!name || isNaN(value) || value<=0){ skipped++; return; }
+    debtsCache.push({id:uid(), name, value, category, paid:false});
+    added++;
+  });
+  renderDebts();
+  showImportResult(added, skipped);
+  await persistDebts();
+}
+
+function showImportResult(added, skipped){
+  const msgBox = document.getElementById('importMsg');
+  if(added===0){
+    msgBox.className = 'import-msg err';
+    msgBox.textContent = 'Nenhuma linha reconhecida. Confira o formato: nome;valor;categoria (ou colunas Descrição/Valor/Categoria no Excel).';
+  } else if(skipped>0){
+    msgBox.className = 'import-msg warn';
+    msgBox.textContent = `${added} dívida(s) importada(s). ${skipped} linha(s) ignorada(s) por não seguir o formato.`;
+  } else {
+    msgBox.className = 'import-msg ok';
+    msgBox.textContent = `${added} dívida(s) importada(s) com sucesso.`;
+  }
+}
+
+/* ============ METAS ============ */
+async function addGoal(){
+  const nameEl = document.getElementById('goalName');
+  const targetEl = document.getElementById('goalTarget');
+
+  const name = nameEl.value.trim();
+  const target = parseValueBR(targetEl.value);
+
+  if(!name || isNaN(target) || target<=0){
+    alert('Preencha o nome da meta e um valor válido maior que zero.');
+    return;
+  }
+
+  goalsCache.push({id:uid(), name, target, saved:0});
+  renderGoals();
+  nameEl.value=''; targetEl.value='';
+  await persistGoals();
+}
+
+async function deleteGoal(id){
+  goalsCache = goalsCache.filter(g=>g.id!==id);
+  renderGoals();
+  await persistGoals();
+}
+
+async function addToGoal(id){
+  const input = document.getElementById('goal-add-'+id);
+  const amount = parseValueBR(input.value);
+  if(isNaN(amount) || amount===0) return;
+  const g = goalsCache.find(x=>x.id===id);
+  if(g){ g.saved = Math.max(0, g.saved + amount); }
+  renderGoals();
+  input.value='';
+  await persistGoals();
+}
+
+function renderGoals(){
+  const goals = goalsCache;
+  const list = document.getElementById('goalList');
+
+  if(goals.length===0){
+    list.innerHTML = '<div class="empty-state">— nenhuma meta criada ainda —</div>';
+    return;
+  }
+
+  list.innerHTML = goals.map(g=>{
+    const pct = Math.min(100, (g.saved/g.target)*100);
+    const done = g.saved >= g.target;
+    return `
+      <div class="goal-card">
+        ${done ? '<div class="goal-stamp">CONQUISTADO</div>' : ''}
+        <div class="goal-head">
+          <span class="name">${escapeHtml(g.name)}</span>
+          <button class="del" onclick="deleteGoal('${g.id}')" title="Excluir">✕</button>
+        </div>
+        <div class="goal-nums">
+          <span class="mono">${formatBRL(g.saved)}</span>
+          <span class="mono">${formatBRL(g.target)}</span>
+        </div>
+        <div class="goal-track">
+          <div class="goal-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="goal-pct">${done ? '<span class="goal-done">meta batida 🎉</span>' : pct.toFixed(0)+'% concluído'}</div>
+        <div class="goal-add">
+          <input id="goal-add-${g.id}" type="text" inputmode="decimal" placeholder="Adicionar valor (R$)">
+          <button class="btn small" onclick="addToGoal('${g.id}')">Somar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============ CALCULADORA ============ */
+let calcState = { display:'0', prev:null, op:null, memory:0, justEvaluated:false };
+
+function calcRender(){
+  document.getElementById('calcVal').textContent = calcState.display;
+  document.getElementById('calcMem').textContent = calcState.memory !== 0 ? ('M = '+ calcState.memory.toLocaleString('pt-BR')) : '\u00A0';
+}
+
+function calcClear(){
+  calcState = { display:'0', prev:null, op:null, memory:calcState.memory, justEvaluated:false };
+  calcRender();
+}
+
+function calcCompute(a,b,op){
+  switch(op){
+    case '+': return a+b;
+    case '-': return a-b;
+    case '×': return a*b;
+    case '÷': return b===0 ? NaN : a/b;
+    default: return b;
+  }
+}
+
+function calcInput(key){
+  let d = calcState.display;
+
+  if(key==='back'){
+    calcState.display = d.length>1 ? d.slice(0,-1) : '0';
+    calcRender();
+    return;
+  }
+
+  if(/[0-9]/.test(key)){
+    if(d==='0' || calcState.justEvaluated){
+      d = key;
+      calcState.justEvaluated = false;
+    } else {
+      d = d + key;
+    }
+    calcState.display = d;
+    calcRender();
+    return;
+  }
+
+  if(key==='.'){
+    calcState.justEvaluated = false;
+    if(!d.includes('.')) calcState.display = d + '.';
+    calcRender();
+    return;
+  }
+
+  if(key==='%'){
+    const n = parseFloat(d)/100;
+    calcState.display = String(n);
+    calcRender();
+    return;
+  }
+
+  if(['+','-','×','÷'].includes(key)){
+    const current = parseFloat(calcState.display);
+    if(calcState.prev!==null && calcState.op && !calcState.justEvaluated){
+      const result = calcCompute(calcState.prev, current, calcState.op);
+      calcState.prev = result;
+      calcState.display = String(round(result));
+    } else {
+      calcState.prev = current;
+    }
+    calcState.op = key;
+    calcState.justEvaluated = true;
+    calcRender();
+    return;
+  }
+
+  if(key==='='){
+    if(calcState.op!==null && calcState.prev!==null){
+      const current = parseFloat(calcState.display);
+      const result = calcCompute(calcState.prev, current, calcState.op);
+      calcState.display = isNaN(result) ? 'Erro' : String(round(result));
+      calcState.prev = null;
+      calcState.op = null;
+      calcState.justEvaluated = true;
+    }
+    calcRender();
+    return;
+  }
+}
+
+function round(n){
+  return Math.round((n + Number.EPSILON) * 1e10) / 1e10;
+}
+
+function calcMemory(action){
+  const current = parseFloat(calcState.display) || 0;
+  if(action==='MC') calcState.memory = 0;
+  if(action==='MR') { calcState.display = String(calcState.memory); calcState.justEvaluated=true; }
+  if(action==='M+') calcState.memory += current;
+  if(action==='M-') calcState.memory -= current;
+  calcRender();
+}
+
+/* ============ INIT ============ */
+renderBarcode();
+renderReceiptMeta();
+newPhrase();
+calcRender();
+
+window.addEventListener('load', () => {
+  // GIS carrega de forma assíncrona (script com defer); espera um instante e inicializa.
+  const tryInit = () => {
+    if(window.google && google.accounts){
+      initGis();
+      // se já tem planilha configurada neste aparelho, tenta entrar sem pedir clique
+      if(getSheetId()){
+        requestToken(false)
+          .then(bootApp)
+          .catch(()=>{ /* precisa clicar em "Entrar com Google" de novo */ });
+      }
+    } else {
+      setTimeout(tryInit, 200);
+    }
+  };
+  tryInit();
+});
+</script>
+
+</body>
+</html>
