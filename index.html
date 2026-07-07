@@ -698,6 +698,16 @@
           <input type="file" id="fileInput" accept=".txt,.xlsx,.xls" onchange="handleFile(event)">
           <div class="import-msg" id="importMsg"></div>
         </div>
+
+        <div class="import-box" style="margin-top:14px;">
+          <h3>Exportar / compartilhar</h3>
+          <p>Baixe suas dívidas atuais nesses formatos, ou compartilhe direto pelo celular.</p>
+          <div class="import-row" style="gap:8px;flex-wrap:wrap;">
+            <button class="btn small" onclick="exportTxt()">⬇ baixar .txt</button>
+            <button class="btn small" onclick="exportXlsx()">⬇ baixar .xlsx</button>
+            <button class="btn small" id="shareBtn" style="display:none;background:var(--gold);" onclick="shareDebts()">↗ compartilhar</button>
+          </div>
+        </div>
       </section>
 
       <!-- ================= METAS ================= -->
@@ -1338,6 +1348,50 @@ function showImportResult(added, skipped){
   }
 }
 
+/* ============ EXPORTAR / COMPARTILHAR ============ */
+function debtsToTxt(){
+  return debtsCache.map(d =>
+    `${d.name};${d.value.toFixed(2).replace('.', ',')};${d.category};${d.paid ? 'sim' : 'nao'}`
+  ).join('\n');
+}
+
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportTxt(){
+  if(debtsCache.length===0){ alert('Não há dívidas para exportar ainda.'); return; }
+  downloadBlob(debtsToTxt(), 'dividas-zerado.txt', 'text/plain;charset=utf-8');
+}
+
+function exportXlsx(){
+  if(debtsCache.length===0){ alert('Não há dívidas para exportar ainda.'); return; }
+  const rows = [['Descrição','Valor','Categoria','Pago']];
+  debtsCache.forEach(d => rows.push([d.name, d.value, d.category, d.paid ? 'Sim' : 'Não']));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dividas');
+  XLSX.writeFile(wb, 'dividas-zerado.xlsx');
+}
+
+async function shareDebts(){
+  if(debtsCache.length===0){ alert('Não há dívidas para compartilhar ainda.'); return; }
+  const text = debtsToTxt();
+  try{
+    const file = new File([text], 'dividas-zerado.txt', {type:'text/plain'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'Minhas dívidas — Zerado'});
+    } else if(navigator.share){
+      await navigator.share({title:'Minhas dívidas — Zerado', text});
+    }
+  }catch(err){ /* usuário cancelou o compartilhamento, tudo bem */ }
+}
+
 /* ============ METAS ============ */
 async function addGoal(){
   const nameEl = document.getElementById('goalName');
@@ -1515,6 +1569,7 @@ renderBarcode();
 renderReceiptMeta();
 newPhrase();
 calcRender();
+if(navigator.share){ document.getElementById('shareBtn').style.display = 'inline-block'; }
 
 window.addEventListener('load', () => {
   // GIS carrega de forma assíncrona (script com defer); espera um instante e inicializa.
