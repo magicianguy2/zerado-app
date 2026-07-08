@@ -1,3 +1,12 @@
+Aqui está o código completo atualizado do ficheiro `zerado.html`.
+
+Adicionei uma lógica inteligente: como a sua planilha do Google Sheets guarda apenas os dados básicos, utilizei o formato do nome da parcela (por exemplo, encontrando padrões como `(01/05)`, `(02/05)`) para detetar automaticamente que aquela dívida faz parte de um parcelamento.
+
+Quando clica para editar uma parcela e altera o seu valor ou nome, o sistema pergunta: **"Esta dívida parece fazer parte de um parcelamento. Deseja aplicar as alterações também às parcelas seguintes?"**. Se confirmar, ele atualiza a atual e todas as subsequentes em cascata.
+
+Substitua todo o conteúdo do seu ficheiro por este:
+
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -667,12 +676,10 @@
 
     <div class="panel">
 
-      <!-- ================= DÍVIDAS ================= -->
       <section id="view-dividas" class="view active">
         <h2 class="section-title" id="formSectionTitle">Saldo devedor</h2>
         <p class="section-sub" id="formSectionSub">Marque o círculo quando uma dívida for paga — ela sai da conta. Clique no nome para editar.</p>
 
-        <!-- Seletor de visualização de Mês -->
         <div class="month-filter-wrap">
           <label for="monthFilter">VER MÊS:</label>
           <select id="monthFilter" onchange="renderDebts()"></select>
@@ -691,7 +698,6 @@
           </div>
         </div>
 
-        <!-- Form de Lançamento / Edição -->
         <div class="add-form" id="debtFormContainer">
           <input type="hidden" id="editDebtId" value="">
           <div>
@@ -765,7 +771,6 @@
         </div>
       </section>
 
-      <!-- ================= METAS ================= -->
       <section id="view-metas" class="view">
         <h2 class="section-title">Cupons de meta</h2>
         <p class="section-sub">Crie quantas metas quiser e vá somando o que já guardou.</p>
@@ -787,7 +792,6 @@
         <div id="goalList"></div>
       </section>
 
-      <!-- ================= CALCULADORA ================= -->
       <section id="view-calculadora" class="view">
         <h2 class="section-title">Calculadora</h2>
         <p class="section-sub">Aritmética completa, porcentagem e memória.</p>
@@ -954,7 +958,7 @@ const PHRASES = [
 "O dinheiro parado na meta está mais seguro que qualquer promoção tentadora.",
 "Você não fica rico de uma vez, fica rico todo dia um pouco.",
 "A régua de dívida é só o espelho do seu comportamento — e comportamento muda.",
-"Cada real na meta hoje é menos dependência de crédito amanhã.",
+"Cada real na meta hoje é menos dependência de crédito amãnhã.",
 "O controle financeiro começa no momento em que você para de fingir que não vai olhar o extrato.",
 "Uma meta pequena batida ensina a bater uma meta grande.",
 "Cortar gasto supérfluo não é sacrifício, é prioridade escolhida.",
@@ -1272,7 +1276,10 @@ function startEditDebt(id) {
 
   // Preenche o formulário com os dados da dívida selecionada
   document.getElementById('editDebtId').value = d.id;
-  document.getElementById('debtName').value = d.name;
+  
+  // Extrai o nome limpo caso contenha o indicador de parcelas (ex: "Compra (01/05)" vira "Compra")
+  let cleanName = d.name.replace(/\s\(\d{2}\/\d{2}\)$/, '');
+  document.getElementById('debtName').value = cleanName;
   document.getElementById('debtValue').value = d.value.toFixed(2).replace('.', ',');
   document.getElementById('debtStartMonth').value = d.mes_ano;
 
@@ -1286,7 +1293,7 @@ function startEditDebt(id) {
     document.getElementById('customCategoryWrap').style.display = 'block';
   }
 
-  // Oculta a seleção de parcelamento na edição para evitar bagunçar parcelas geradas
+  // Oculta a seleção de parcelamento na edição
   document.getElementById('installmentFieldWrap').style.display = 'none';
 
   // Altera os botões do formulário para modo Edição
@@ -1295,12 +1302,11 @@ function startEditDebt(id) {
     <button class="btn" style="background: var(--gold);" onclick="submitDebtForm()">✓ salvar alterações</button>
   `;
   
-  // Rola até o topo do formulário para ficar visível no mobile
+  // Rola até o topo do formulário
   document.getElementById('debtFormContainer').scrollIntoView({ behavior: 'smooth' });
 }
 
 function cancelEditDebt() {
-  // Limpa o formulário e restaura o layout original de inserção
   document.getElementById('editDebtId').value = '';
   document.getElementById('debtName').value = '';
   document.getElementById('debtValue').value = '';
@@ -1341,14 +1347,76 @@ async function submitDebtForm() {
     // Cenário: EDITANDO DÍVIDA EXISTENTE
     const idx = debtsCache.findIndex(x => x.id === editId);
     if (idx !== -1) {
-      debtsCache[idx].name = name;
-      debtsCache[idx].value = value;
-      debtsCache[idx].category = category;
-      debtsCache[idx].mes_ano = startMonth;
+      const oldDebt = debtsCache[idx];
+      
+      // Deteta se o nome antigo tinha o formato de parcela "(XX/TT)"
+      const installmentMatch = oldDebt.name.match(/\s\((\d{2})\/(\d{2})\)$/);
+      let editCascade = false;
+      let cleanOldName = oldDebt.name;
+
+      if (installmentMatch) {
+        cleanOldName = oldDebt.name.replace(/\s\(\d{2}\/\d{2}\)$/, '');
+        const currentPart = parseInt(installmentMatch[1]);
+        const totalParts = parseInt(installmentMatch[2]);
+        
+        // Pergunta se deseja aplicar em cascata para as próximas parcelas
+        if (currentPart < totalParts) {
+          editCascade = confirm("Esta dívida parece fazer parte de um parcelamento. Deseja aplicar as alterações de Nome, Valor e Categoria também às parcelas seguintes deste grupo?");
+        }
+      }
+
+      if (editCascade && installmentMatch) {
+        const currentPart = parseInt(installmentMatch[1]);
+        const totalParts = parseInt(installmentMatch[2]);
+        
+        // Descobre o offset de meses entre a parcela editada e as subsequentes com base no nome original limpo
+        // Filtra todas as parcelas que casam com o padrão do nome antigo limpo
+        let basePartMonth = new Date(oldDebt.mes_ano + '-02'); // dia 02 evita bugs de fuso horário
+
+        debtsCache.forEach(d => {
+          const m = d.name.match(/\s\((\d{2})\/(\d{2})\)$/);
+          if (m) {
+            const dCleanName = d.name.replace(/\s\(\d{2}\/\d{2}\)$/, '');
+            const dPart = parseInt(m[1]);
+            const dTotal = parseInt(m[2]);
+
+            // Se pertencer ao mesmo grupo de parcelamento (mesmo nome base, mesmo total de parcelas e número posterior)
+            if (dCleanName === cleanOldName && dTotal === totalParts && dPart >= currentPart) {
+              // Atualiza Dados básicos
+              d.name = `${name} (${String(dPart).padStart(2, '0')}/${String(totalParts).padStart(2, '0')})`;
+              d.value = value;
+              d.category = category;
+
+              // Calcula o novo mês proporcional ao novo mês escolhido na edição
+              const partDiff = dPart - currentPart;
+              const [newYear, newMonthNum] = startMonth.split('-').map(Number);
+              
+              let calcMonth = newMonthNum - 1 + partDiff;
+              let yearOffset = Math.floor(calcMonth / 12);
+              let targetYear = newYear + yearOffset;
+              let targetMonth = (calcMonth % 12) + 1;
+              
+              d.mes_ano = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+            }
+          }
+        });
+
+      } else {
+        // Edição normal de uma única parcela/dívida isolada
+        const installmentMatchNow = oldDebt.name.match(/\s\((\d{2})\/(\d{2})\)$/);
+        if (installmentMatchNow) {
+          debtsCache[idx].name = `${name} (${installmentMatchNow[1]}/${installmentMatchNow[2]})`;
+        } else {
+          debtsCache[idx].name = name;
+        }
+        debtsCache[idx].value = value;
+        debtsCache[idx].category = category;
+        debtsCache[idx].mes_ano = startMonth;
+      }
     }
     cancelEditDebt();
   } else {
-    // Cenário: CRIANDO NOVA DÍVIDA (com parcelamento facultativo)
+    // Cenário: CRIANDO NOVA DÍVIDA (com parcelamento)
     const installmentsEl = document.getElementById('debtInstallments');
     const totalInstallments = parseInt(installmentsEl.value);
     const [startYear, startMonthNum] = startMonth.split('-').map(Number);
@@ -1795,3 +1863,5 @@ window.addEventListener('load', () => {
 
 </body>
 </html>
+
+```
