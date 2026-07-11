@@ -317,8 +317,6 @@
   .btn:hover{ background:var(--cash); }
   .btn:focus-visible{ outline:2px solid var(--cash-bright); outline-offset:2px; }
   .btn.small{ padding:7px 12px; font-size:11px; }
-  .btn.cancel { background:var(--stamp); margin-right:6px;}
-  .btn.cancel:hover { opacity:0.9; }
 
   /* ===================== DEBT LINE ITEMS ===================== */
   .debt-item{
@@ -363,10 +361,6 @@
     gap:6px;
     min-width:0;
     overflow:hidden;
-    cursor: pointer;
-  }
-  .debt-item .name-row:hover .name {
-    color: var(--cash-bright);
   }
   .debt-item .name{
     font-weight:600;
@@ -408,28 +402,6 @@
     padding:18px 0;
     text-align:center;
     font-style:italic;
-  }
-
-  /* Month Filter Design */
-  .month-filter-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--paper-3);
-    padding: 8px 12px;
-    margin-bottom: 14px;
-    border-radius: 2px;
-  }
-  .month-filter-wrap label {
-    font-family: 'Courier Prime', monospace;
-    font-weight: 700;
-    font-size: 13px;
-  }
-  .month-filter-wrap select {
-    width: auto;
-    background: var(--paper);
-    padding: 4px 8px;
-    font-size: 13px;
   }
 
   /* ===================== IMPORT ===================== */
@@ -667,14 +639,10 @@
 
     <div class="panel">
 
+      <!-- ================= DÍVIDAS ================= -->
       <section id="view-dividas" class="view active">
-        <h2 class="section-title" id="formSectionTitle">Saldo devedor</h2>
-        <p class="section-sub" id="formSectionSub">Marque o círculo quando uma dívida for paga — ela sai da conta. Clique no nome para editar.</p>
-
-        <div class="month-filter-wrap">
-          <label for="monthFilter">VER MÊS:</label>
-          <select id="monthFilter" onchange="renderDebts()"></select>
-        </div>
+        <h2 class="section-title">Saldo devedor</h2>
+        <p class="section-sub">Marque o círculo quando uma dívida for paga — ela sai da conta.</p>
 
         <div class="ruler-wrap">
           <div class="stamp" id="paidStamp">QUITADO ✓</div>
@@ -689,15 +657,14 @@
           </div>
         </div>
 
-        <div class="add-form" id="debtFormContainer">
-          <input type="hidden" id="editDebtId" value="">
+        <div class="add-form">
           <div>
             <label class="field-label">Descrição</label>
             <input id="debtName" type="text" placeholder="Ex: fatura do cartão">
           </div>
           <div>
-            <label class="field-label">Valor da Parcela/Dívida (R$)</label>
-            <input id="debtValue" type="text" inputmode="decimal" placeholder="150,00">
+            <label class="field-label">Valor (R$)</label>
+            <input id="debtValue" type="text" inputmode="numeric" placeholder="R$ 0,00">
           </div>
           <div>
             <label class="field-label">Categoria</label>
@@ -708,31 +675,12 @@
               <option value="Personalizado">Personalizado</option>
             </select>
           </div>
-          <div id="installmentFieldWrap">
-            <label class="field-label">Parcelamento / Repetição</label>
-            <select id="debtInstallments">
-              <option value="1">À vista (1x)</option>
-              <option value="2">2x</option>
-              <option value="3">3x</option>
-              <option value="4">4x</option>
-              <option value="5">5x</option>
-              <option value="6">6x</option>
-              <option value="10">10x</option>
-              <option value="12">12x</option>
-              <option value="24">24x</option>
-              <option value="36">36x</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">Mês de Referência</label>
-            <input id="debtStartMonth" type="month">
-          </div>
           <div id="customCategoryWrap" style="display:none;">
             <label class="field-label">Nome da categoria</label>
             <input id="debtCustomCategory" type="text" placeholder="Ex: viagem, saúde...">
           </div>
-          <div class="full" id="formActionsWrap" style="text-align: right; display: flex; justify-content: flex-end;">
-            <button class="btn" id="submitDebtBtn" onclick="submitDebtForm()">+ lançar dívida</button>
+          <div class="full">
+            <button class="btn" onclick="addDebt()">+ lançar dívida</button>
           </div>
         </div>
 
@@ -743,25 +691,16 @@
         <div class="import-box">
           <h3>Importar de arquivo</h3>
           <p>
-            <strong>.txt:</strong> uma dívida por linha, formato <code>nome;valor;categoria;pago;ano-mes</code> (categoria, pago e ano-mes opcionais).<br>
-            <strong>.xlsx:</strong> colunas fixas na 1ª linha: <code>Descrição</code>, <code>Valor</code>, <code>Categoria</code>, <code>Mês</code>.<br>
+            <strong>.txt:</strong> uma dívida por linha, formato <code>nome;valor;categoria</code> (categoria opcional).<br>
+            <strong>.xlsx:</strong> colunas fixas na 1ª linha: <code>Descrição</code>, <code>Valor</code>, <code>Categoria</code>.<br>
             Linha fora do formato é pulada e avisada no final — nada é adivinhado.
           </p>
           <input type="file" id="fileInput" accept=".txt,.xlsx,.xls" onchange="handleFile(event)">
           <div class="import-msg" id="importMsg"></div>
         </div>
-
-        <div class="import-box" style="margin-top:14px;">
-          <h3>Exportar / compartilhar</h3>
-          <p>Baixe suas dívidas atuais nesses formatos, ou compartilhe direto pelo celular.</p>
-          <div class="import-row" style="gap:8px;flex-wrap:wrap;">
-            <button class="btn small" onclick="exportTxt()">⬇ baixar .txt</button>
-            <button class="btn small" onclick="exportXlsx()">⬇ baixar .xlsx</button>
-            <button class="btn small" id="shareBtn" style="display:none;background:var(--gold);" onclick="shareDebts()">↗ compartilhar</button>
-          </div>
-        </div>
       </section>
 
+      <!-- ================= METAS ================= -->
       <section id="view-metas" class="view">
         <h2 class="section-title">Cupons de meta</h2>
         <p class="section-sub">Crie quantas metas quiser e vá somando o que já guardou.</p>
@@ -773,7 +712,7 @@
           </div>
           <div>
             <label class="field-label">Valor da meta (R$)</label>
-            <input id="goalTarget" type="text" inputmode="decimal" placeholder="150,00">
+            <input id="goalTarget" type="text" inputmode="numeric" placeholder="R$ 0,00">
           </div>
           <div class="full">
             <button class="btn" onclick="addGoal()">+ criar meta</button>
@@ -783,6 +722,7 @@
         <div id="goalList"></div>
       </section>
 
+      <!-- ================= CALCULADORA ================= -->
       <section id="view-calculadora" class="view">
         <h2 class="section-title">Calculadora</h2>
         <p class="section-sub">Aritmética completa, porcentagem e memória.</p>
@@ -932,7 +872,7 @@ const PHRASES = [
 "O planejamento financeiro é o único orçamento que rende juro de tranquilidade.",
 "Cada real a menos gasto hoje é um real a mais livre amanhã.",
 "Reserva de emergência é o colchão que você não vê até precisar dele.",
-"Quem revisa a fatura entende os próprios habits antes que eles virem problema.",
+"Quem revisa a fatura entende os próprios hábitos antes que eles virem problema.",
 "O hábito de poupar pequeno é o que sustenta a meta grande.",
 "Você não precisa ser perfeito com dinheiro, precisa ser consistente.",
 "Um mês difícil não apaga três meses de disciplina.",
@@ -949,7 +889,7 @@ const PHRASES = [
 "O dinheiro parado na meta está mais seguro que qualquer promoção tentadora.",
 "Você não fica rico de uma vez, fica rico todo dia um pouco.",
 "A régua de dívida é só o espelho do seu comportamento — e comportamento muda.",
-"Cada real na meta hoje é menos dependência de crédito amãnhã.",
+"Cada real na meta hoje é menos dependência de crédito amanhã.",
 "O controle financeiro começa no momento em que você para de fingir que não vai olhar o extrato.",
 "Uma meta pequena batida ensina a bater uma meta grande.",
 "Cortar gasto supérfluo não é sacrifício, é prioridade escolhida.",
@@ -967,7 +907,7 @@ const PHRASES = [
 "Reduzir uma dívida por mês já muda o próximo ano inteiro.",
 "O hábito vence a motivação todos os dias da semana.",
 "Cada aporte, por menor que seja, empurra a barra da meta pra frente.",
-"Dinheiro organized é menos ansiedade guardada."
+"Dinheiro organizado é menos ansiedade guardada."
 ];
 let phraseIdx = -1;
 function newPhrase(){
@@ -996,6 +936,9 @@ function renderReceiptMeta(){
 }
 
 /* ============ GOOGLE SHEETS COMO BANCO DE DADOS ============ */
+// 1) Troque pelo Client ID que você criar no Google Cloud Console (OAuth 2.0 - app da Web).
+// 2) Publique este arquivo num endereço https (ex: GitHub Pages) e cadastre esse endereço
+//    como "Origem JavaScript autorizada" na credencial do Google.
 const GOOGLE_CLIENT_ID = "420831351603-i8f6or1qvi0tl4c3r319pahpkk615v8c.apps.googleusercontent.com";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
@@ -1085,7 +1028,7 @@ async function createSpreadsheet(){
     sheets:[ {properties:{title:'Dividas'}}, {properties:{title:'Metas'}} ]
   };
   const data = await sheetsFetch('', { method:'POST', body: JSON.stringify(body) });
-  await writeRange(data.spreadsheetId, 'Dividas!A1:F1', [['id','nome','valor','categoria','pago','mes_ano']]);
+  await writeRange(data.spreadsheetId, 'Dividas!A1:E1', [['id','nome','valor','categoria','pago']]);
   await writeRange(data.spreadsheetId, 'Metas!A1:D1', [['id','nome','meta','guardado']]);
   return data.spreadsheetId;
 }
@@ -1093,23 +1036,17 @@ async function createSpreadsheet(){
 async function loadAll(){
   setSyncStatus('loading');
   const sheetId = getSheetId();
-  try {
-    const debtRows = await readRange(sheetId, 'Dividas!A2:F100000');
-    
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
+  try{
+    const debtRows = await readRange(sheetId, 'Dividas!A2:E100000');
     debtsCache = debtRows.filter(r=>r[0]).map(r=>({
       id:r[0], name:r[1]||'', value:parseFloat(String(r[2]).replace(',','.'))||0,
-      category:r[3]||'Personalizado', paid: r[4]==='1' || r[4]===1 || r[4]===true || String(r[4]).toUpperCase()==='TRUE',
-      mes_ano: r[5] || currentMonthStr
+      category:r[3]||'Personalizado', paid: r[4]==='1' || r[4]===1 || r[4]===true || String(r[4]).toUpperCase()==='TRUE'
     }));
     const goalRows = await readRange(sheetId, 'Metas!A2:D100000');
     goalsCache = goalRows.filter(r=>r[0]).map(r=>({
       id:r[0], name:r[1]||'', target:parseFloat(String(r[2]).replace(',','.'))||0, saved:parseFloat(String(r[3]).replace(',','.'))||0
     }));
     setSyncStatus('ok');
-    updateMonthFilterOptions();
   }catch(err){
     console.error(err);
     debtsCache = []; goalsCache = [];
@@ -1121,9 +1058,9 @@ async function persistDebts(){
   setSyncStatus('saving');
   try{
     const sheetId = getSheetId();
-    await clearRange(sheetId, 'Dividas!A2:F100000');
+    await clearRange(sheetId, 'Dividas!A2:E100000');
     if(debtsCache.length>0){
-      const rows = debtsCache.map(d=>[d.id, d.name, d.value, d.category, d.paid ? 1 : 0, d.mes_ano]);
+      const rows = debtsCache.map(d=>[d.id, d.name, d.value, d.category, d.paid ? 1 : 0]);
       await writeRange(sheetId, 'Dividas!A2', rows);
     }
     setSyncStatus('ok');
@@ -1196,10 +1133,6 @@ async function bootApp(){
   document.getElementById('appShell').style.display='block';
   const sid = getSheetId();
   document.getElementById('sheetIdLabel').textContent = sid;
-  
-  const now = new Date();
-  document.getElementById('debtStartMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
   await loadAll();
   renderDebts();
   renderGoals();
@@ -1222,36 +1155,28 @@ function formatBRL(n){
   return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
+/* ============ MÁSCARA DE MOEDA ============ */
+function maskCurrencyInput(e){
+  let digits = e.target.value.replace(/\D/g,'');
+  if(digits===''){ e.target.value=''; return; }
+  digits = digits.replace(/^0+(?=\d)/,'');
+  while(digits.length<3) digits = '0'+digits;
+  const cents = digits.slice(-2);
+  let reais = digits.slice(0,-2).replace(/^0+(?=\d)/,'');
+  reais = reais.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  e.target.value = 'R$ ' + reais + ',' + cents;
+}
+
+function attachCurrencyMask(input){
+  if(!input || input.dataset.maskAttached) return;
+  input.addEventListener('input', maskCurrencyInput);
+  input.dataset.maskAttached = '1';
+}
+
 /* ============ TABS ============ */
 function switchTab(view){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+view));
-}
-
-/* ============ GERENCIAMENTO DE MESES DA RÉGUA ============ */
-function updateMonthFilterOptions() {
-  const filterSelect = document.getElementById('monthFilter');
-  const savedValue = filterSelect.value;
-  
-  let months = debtsCache.map(d => d.mes_ano);
-  
-  const now = new Date();
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  months.push(currentMonthStr);
-  
-  const uniqueMonths = [...new Set(months)].sort();
-  
-  filterSelect.innerHTML = uniqueMonths.map(m => {
-    const [year, month] = m.split('-');
-    const dateLabel = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    return `<option value="${m}">${dateLabel.toUpperCase()}</option>`;
-  }).join('');
-  
-  if (uniqueMonths.includes(savedValue)) {
-    filterSelect.value = savedValue;
-  } else {
-    filterSelect.value = currentMonthStr;
-  }
 }
 
 /* ============ DÍVIDAS ============ */
@@ -1260,187 +1185,27 @@ function toggleCustomCategory(){
   document.getElementById('customCategoryWrap').style.display = (sel==='Personalizado') ? 'block' : 'none';
 }
 
-/* Modo Edição */
-function startEditDebt(id) {
-  const d = debtsCache.find(x => x.id === id);
-  if (!d) return;
-
-  // Preenche o formulário com os dados da dívida selecionada
-  document.getElementById('editDebtId').value = d.id;
-  
-  // Extrai o nome limpo caso contenha o indicador de parcelas (ex: "Compra (01/05)" vira "Compra")
-  let cleanName = d.name.replace(/\s\(\d{2}\/\d{2}\)$/, '');
-  document.getElementById('debtName').value = cleanName;
-  document.getElementById('debtValue').value = d.value.toFixed(2).replace('.', ',');
-  document.getElementById('debtStartMonth').value = d.mes_ano;
-
-  const categories = ['Contas', 'Cartão de Crédito', 'Dívidas Pessoais'];
-  if (categories.includes(d.category)) {
-    document.getElementById('debtCategory').value = d.category;
-    document.getElementById('customCategoryWrap').style.display = 'none';
-  } else {
-    document.getElementById('debtCategory').value = 'Personalizado';
-    document.getElementById('debtCustomCategory').value = d.category;
-    document.getElementById('customCategoryWrap').style.display = 'block';
-  }
-
-  // Oculta a seleção de parcelamento na edição
-  document.getElementById('installmentFieldWrap').style.display = 'none';
-
-  // Altera os botões do formulário para modo Edição
-  document.getElementById('formActionsWrap').innerHTML = `
-    <button class="btn cancel" onclick="cancelEditDebt()">Cancelar</button>
-    <button class="btn" style="background: var(--gold);" onclick="submitDebtForm()">✓ salvar alterações</button>
-  `;
-  
-  // Rola até o topo do formulário
-  document.getElementById('debtFormContainer').scrollIntoView({ behavior: 'smooth' });
-}
-
-function cancelEditDebt() {
-  document.getElementById('editDebtId').value = '';
-  document.getElementById('debtName').value = '';
-  document.getElementById('debtValue').value = '';
-  document.getElementById('debtCategory').value = 'Contas';
-  document.getElementById('debtCustomCategory').value = '';
-  document.getElementById('customCategoryWrap').style.display = 'none';
-  document.getElementById('installmentFieldWrap').style.display = 'block';
-
-  document.getElementById('formActionsWrap').innerHTML = `
-    <button class="btn" id="submitDebtBtn" onclick="submitDebtForm()">+ lançar dívida</button>
-  `;
-}
-
-async function submitDebtForm() {
-  const editId = document.getElementById('editDebtId').value;
-  
+async function addDebt(){
   const nameEl = document.getElementById('debtName');
   const valEl = document.getElementById('debtValue');
   const catEl = document.getElementById('debtCategory');
   const customEl = document.getElementById('debtCustomCategory');
-  const startMonthEl = document.getElementById('debtStartMonth');
 
   const name = nameEl.value.trim();
   const value = parseValueBR(valEl.value);
-  const startMonth = startMonthEl.value;
-
   let category = catEl.value;
   if(category==='Personalizado' && customEl.value.trim()){
     category = customEl.value.trim();
   }
 
-  if(!name || isNaN(value) || value<=0 || !startMonth){
-    alert('Preencha nome, mês e um valor válido maior que zero.');
+  if(!name || isNaN(value) || value<=0){
+    alert('Preencha nome e um valor válido maior que zero.');
     return;
   }
 
-  if (editId) {
-    // Cenário: EDITANDO DÍVIDA EXISTENTE
-    const idx = debtsCache.findIndex(x => x.id === editId);
-    if (idx !== -1) {
-      const oldDebt = debtsCache[idx];
-      
-      // Deteta se o nome antigo tinha o formato de parcela "(XX/TT)"
-      const installmentMatch = oldDebt.name.match(/\s\((\d{2})\/(\d{2})\)$/);
-      let editCascade = false;
-      let cleanOldName = oldDebt.name;
-
-      if (installmentMatch) {
-        cleanOldName = oldDebt.name.replace(/\s\(\d{2}\/\d{2}\)$/, '');
-        const currentPart = parseInt(installmentMatch[1]);
-        const totalParts = parseInt(installmentMatch[2]);
-        
-        // Pergunta se deseja aplicar em cascata para as próximas parcelas
-        if (currentPart < totalParts) {
-          editCascade = confirm("Esta dívida parece fazer parte de um parcelamento. Deseja aplicar as alterações de Nome, Valor e Categoria também às parcelas seguintes deste grupo?");
-        }
-      }
-
-      if (editCascade && installmentMatch) {
-        const currentPart = parseInt(installmentMatch[1]);
-        const totalParts = parseInt(installmentMatch[2]);
-        
-        // Descobre o offset de meses entre a parcela editada e as subsequentes com base no nome original limpo
-        // Filtra todas as parcelas que casam com o padrão do nome antigo limpo
-        let basePartMonth = new Date(oldDebt.mes_ano + '-02'); // dia 02 evita bugs de fuso horário
-
-        debtsCache.forEach(d => {
-          const m = d.name.match(/\s\((\d{2})\/(\d{2})\)$/);
-          if (m) {
-            const dCleanName = d.name.replace(/\s\(\d{2}\/\d{2}\)$/, '');
-            const dPart = parseInt(m[1]);
-            const dTotal = parseInt(m[2]);
-
-            // Se pertencer ao mesmo grupo de parcelamento (mesmo nome base, mesmo total de parcelas e número posterior)
-            if (dCleanName === cleanOldName && dTotal === totalParts && dPart >= currentPart) {
-              // Atualiza Dados básicos
-              d.name = `${name} (${String(dPart).padStart(2, '0')}/${String(totalParts).padStart(2, '0')})`;
-              d.value = value;
-              d.category = category;
-
-              // Calcula o novo mês proporcional ao novo mês escolhido na edição
-              const partDiff = dPart - currentPart;
-              const [newYear, newMonthNum] = startMonth.split('-').map(Number);
-              
-              let calcMonth = newMonthNum - 1 + partDiff;
-              let yearOffset = Math.floor(calcMonth / 12);
-              let targetYear = newYear + yearOffset;
-              let targetMonth = (calcMonth % 12) + 1;
-              
-              d.mes_ano = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
-            }
-          }
-        });
-
-      } else {
-        // Edição normal de uma única parcela/dívida isolada
-        const installmentMatchNow = oldDebt.name.match(/\s\((\d{2})\/(\d{2})\)$/);
-        if (installmentMatchNow) {
-          debtsCache[idx].name = `${name} (${installmentMatchNow[1]}/${installmentMatchNow[2]})`;
-        } else {
-          debtsCache[idx].name = name;
-        }
-        debtsCache[idx].value = value;
-        debtsCache[idx].category = category;
-        debtsCache[idx].mes_ano = startMonth;
-      }
-    }
-    cancelEditDebt();
-  } else {
-    // Cenário: CRIANDO NOVA DÍVIDA (com parcelamento)
-    const installmentsEl = document.getElementById('debtInstallments');
-    const totalInstallments = parseInt(installmentsEl.value);
-    const [startYear, startMonthNum] = startMonth.split('-').map(Number);
-
-    for (let i = 0; i < totalInstallments; i++) {
-      let currentMonth = startMonthNum - 1 + i;
-      let yearOffset = Math.floor(currentMonth / 12);
-      let targetYear = startYear + yearOffset;
-      let targetMonth = (currentMonth % 12) + 1;
-      
-      let mesAnoStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
-      
-      let finalName = name;
-      if (totalInstallments > 1) {
-        finalName = `${name} (${String(i + 1).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
-      }
-
-      debtsCache.push({
-        id: uid(),
-        name: finalName,
-        value: value,
-        category,
-        paid: false,
-        mes_ano: mesAnoStr
-      });
-    }
-    nameEl.value=''; valEl.value=''; customEl.value='';
-    installmentsEl.value='1';
-  }
-
-  updateMonthFilterOptions();
-  document.getElementById('monthFilter').value = startMonth;
+  debtsCache.push({id:uid(), name, value, category, paid:false});
   renderDebts();
+  nameEl.value=''; valEl.value=''; customEl.value='';
   await persistDebts();
 }
 
@@ -1452,33 +1217,26 @@ async function togglePaid(id){
 }
 
 async function deleteDebt(id){
-  if(document.getElementById('editDebtId').value === id) {
-    cancelEditDebt();
-  }
   debtsCache = debtsCache.filter(x=>x.id!==id);
-  updateMonthFilterOptions();
   renderDebts();
   await persistDebts();
 }
 
 function renderDebts(){
-  const filterSelect = document.getElementById('monthFilter');
-  const activeMonth = filterSelect.value;
-
-  const filteredDebts = debtsCache.filter(d => d.mes_ano === activeMonth);
+  const debts = debtsCache;
   const list = document.getElementById('debtList');
 
-  if(filteredDebts.length===0){
-    list.innerHTML = '<div class="empty-state">— nenhuma dívida para este mês —</div>';
+  if(debts.length===0){
+    list.innerHTML = '<div class="empty-state">— nenhuma dívida lançada ainda —</div>';
   } else {
-    list.innerHTML = filteredDebts.map(d => `
+    list.innerHTML = debts.map(d => `
       <div class="debt-item">
         <input type="checkbox" class="punch" ${d.paid?'checked':''} onchange="togglePaid('${d.id}')">
-        <div class="name-row" onclick="startEditDebt('${d.id}')" title="Clique para editar">
+        <div class="name-row">
           <span class="name ${d.paid?'paid':''}">${escapeHtml(d.name)}</span>
           <span class="leader"></span>
         </div>
-        <div style="text-align:right; cursor: pointer;" onclick="startEditDebt('${d.id}')">
+        <div style="text-align:right;">
           <div class="val ${d.paid?'paid':''} mono">${formatBRL(d.value)}</div>
           <span class="cat">${escapeHtml(d.category)}</span>
         </div>
@@ -1487,8 +1245,8 @@ function renderDebts(){
     `).join('');
   }
 
-  const total = filteredDebts.reduce((s,d)=>s+d.value,0);
-  const remaining = filteredDebts.filter(d=>!d.paid).reduce((s,d)=>s+d.value,0);
+  const total = debts.reduce((s,d)=>s+d.value,0);
+  const remaining = debts.filter(d=>!d.paid).reduce((s,d)=>s+d.value,0);
   const paidSum = total - remaining;
   const pct = total>0 ? (remaining/total*100) : 0;
 
@@ -1554,22 +1312,15 @@ function handleFile(evt){
 
 async function importLines(lines){
   let added=0, skipped=0;
-  const now = new Date();
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
   lines.forEach(line=>{
     const parts = line.split(';').map(p=>p.trim());
     const name = parts[0];
     const value = parseValueBR(parts[1]);
     const category = parts[2] && parts[2].length>0 ? parts[2] : 'Personalizado';
-    const paid = parts[3] === 'sim';
-    const mes_ano = parts[4] && parts[4].match(/^\d{4}-\d{2}$/) ? parts[4] : currentMonthStr;
-
     if(!name || isNaN(value) || value<=0){ skipped++; return; }
-    debtsCache.push({id:uid(), name, value, category, paid, mes_ano});
+    debtsCache.push({id:uid(), name, value, category, paid:false});
     added++;
   });
-  updateMonthFilterOptions();
   renderDebts();
   showImportResult(added, skipped);
   await persistDebts();
@@ -1577,22 +1328,15 @@ async function importLines(lines){
 
 async function importRows(rows){
   let added=0, skipped=0;
-  const now = new Date();
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
   rows.forEach(row=>{
     const name = (row['Descrição'] ?? row['Descricao'] ?? row['descrição'] ?? '').toString().trim();
     const rawVal = row['Valor'] ?? row['valor'];
     const value = typeof rawVal === 'number' ? rawVal : parseValueBR(rawVal);
     const category = (row['Categoria'] ?? row['categoria'] ?? '').toString().trim() || 'Personalizado';
-    const rawMonth = (row['Mês'] ?? row['Mes'] ?? row['mês'] ?? '').toString().trim();
-    const mes_ano = rawMonth.match(/^\d{4}-\d{2}$/) ? rawMonth : currentMonthStr;
-
     if(!name || isNaN(value) || value<=0){ skipped++; return; }
-    debtsCache.push({id:uid(), name, value, category, paid:false, mes_ano});
+    debtsCache.push({id:uid(), name, value, category, paid:false});
     added++;
   });
-  updateMonthFilterOptions();
   renderDebts();
   showImportResult(added, skipped);
   await persistDebts();
@@ -1610,50 +1354,6 @@ function showImportResult(added, skipped){
     msgBox.className = 'import-msg ok';
     msgBox.textContent = `${added} dívida(s) importada(s) com sucesso.`;
   }
-}
-
-/* ============ EXPORTAR / COMPARTILHAR ============ */
-function debtsToTxt(){
-  return debtsCache.map(d =>
-    `${d.name};${d.value.toFixed(2).replace('.', ',')};${d.category};${d.paid ? 'sim' : 'nao'};${d.mes_ano}`
-  ).join('\n');
-}
-
-function downloadBlob(content, filename, mime){
-  const blob = new Blob([content], {type: mime});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function exportTxt(){
-  if(debtsCache.length===0){ alert('Não há dívidas para exportar ainda.'); return; }
-  downloadBlob(debtsToTxt(), 'dividas-zerado.txt', 'text/plain;charset=utf-8');
-}
-
-function exportXlsx(){
-  if(debtsCache.length===0){ alert('Não há dívidas para exportar ainda.'); return; }
-  const rows = [['Descrição','Valor','Categoria','Pago', 'Mês']];
-  debtsCache.forEach(d => rows.push([d.name, d.value, d.category, d.paid ? 'Sim' : 'Não', d.mes_ano]));
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Dividas');
-  XLSX.writeFile(wb, 'dividas-zerado.xlsx');
-}
-
-async function shareDebts(){
-  if(debtsCache.length===0){ alert('Não há dívidas para compartilhar ainda.'); return; }
-  const text = debtsToTxt();
-  try{
-    const file = new File([text], 'dividas-zerado.txt', {type:'text/plain'});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:'Minhas dívidas — Zerado'});
-    } else if(navigator.share){
-      await navigator.share({title:'Minhas dívidas — Zerado', text});
-    }
-  }catch(err){ }
 }
 
 /* ============ METAS ============ */
@@ -1720,12 +1420,16 @@ function renderGoals(){
         </div>
         <div class="goal-pct">${done ? '<span class="goal-done">meta batida 🎉</span>' : pct.toFixed(0)+'% concluído'}</div>
         <div class="goal-add">
-          <input id="goal-add-${g.id}" type="text" inputmode="decimal" placeholder="Adicionar valor (R$)">
+          <input id="goal-add-${g.id}" type="text" inputmode="numeric" placeholder="R$ 0,00">
           <button class="btn small" onclick="addToGoal('${g.id}')">Somar</button>
         </div>
       </div>
     `;
   }).join('');
+
+  goals.forEach(g=>{
+    attachCurrencyMask(document.getElementById('goal-add-'+g.id));
+  });
 }
 
 /* ============ CALCULADORA ============ */
@@ -1833,16 +1537,19 @@ renderBarcode();
 renderReceiptMeta();
 newPhrase();
 calcRender();
-if(navigator.share){ document.getElementById('shareBtn').style.display = 'inline-block'; }
+attachCurrencyMask(document.getElementById('debtValue'));
+attachCurrencyMask(document.getElementById('goalTarget'));
 
 window.addEventListener('load', () => {
+  // GIS carrega de forma assíncrona (script com defer); espera um instante e inicializa.
   const tryInit = () => {
     if(window.google && google.accounts){
       initGis();
+      // se já tem planilha configurada neste aparelho, tenta entrar sem pedir clique
       if(getSheetId()){
         requestToken(false)
           .then(bootApp)
-          .catch(()=>{});
+          .catch(()=>{ /* precisa clicar em "Entrar com Google" de novo */ });
       }
     } else {
       setTimeout(tryInit, 200);
@@ -1854,3 +1561,5 @@ window.addEventListener('load', () => {
 
 </body>
 </html>
+
+
