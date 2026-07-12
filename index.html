@@ -689,7 +689,7 @@
         <div class="ruler-wrap">
           <div class="stamp" id="paidStamp">QUITADO ✓</div>
           <div class="ruler-total">
-            <span class="label">Falta pagar</span>
+            <span class="label">Falta pagar neste mês</span>
             <span class="value mono" id="totalDebtValue">R$ 0,00</span>
           </div>
           <div class="ruler-track" id="rulerTrack"></div>
@@ -1381,13 +1381,10 @@ function renderDebts(){
   }
 
   let total=0, paid=0;
-  debtsCache.forEach(d=>{
-    const parcelas = d.parcelas || 1;
-    const paidArr = d.paidInstallments || [];
-    total += d.value;
-    for(let idx=0; idx<parcelas; idx++){
-      if(paidArr.includes(idx)) paid += installmentValue(d, idx);
-    }
+  entries.forEach(e=>{
+    const val = installmentValue(e.debt, e.idx);
+    total += val;
+    if(e.isPaid) paid += val;
   });
   const remaining = total - paid;
   const pct = total>0 ? (remaining/total*100) : 0;
@@ -1395,7 +1392,7 @@ function renderDebts(){
   document.getElementById('totalDebtValue').textContent = formatBRL(remaining);
   document.getElementById('totalDebtValue').classList.toggle('zero', remaining===0);
   document.getElementById('rulerPaidCaption').textContent = formatBRL(paid)+' já quitado';
-  document.getElementById('rulerTotalCaption').textContent = 'de '+formatBRL(total)+' no total';
+  document.getElementById('rulerTotalCaption').textContent = 'de '+formatBRL(total)+' neste mês';
 
   const filledSegs = Math.round((pct/100)*20);
   const track = document.getElementById('rulerTrack');
