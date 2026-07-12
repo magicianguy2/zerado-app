@@ -739,7 +739,7 @@
           <span class="month-label" id="monthLabel">—</span>
           <button class="nav-btn" onclick="nextMonth()">›</button>
         </div>
-        <p class="section-sub" style="margin-top:6px;">Parcelas deste mês. Atrasadas de meses anteriores continuam aparecendo até serem pagas.</p>
+        <p class="section-sub" style="margin-top:6px;">Parcelas referentes apenas a este mês.</p>
 
         <div id="debtList"></div>
 
@@ -1341,14 +1341,12 @@ function monthEntries(){
     const paidArr = d.paidInstallments || [];
     for(let idx=0; idx<parcelas; idx++){
       const dueMonth = addMonths(mesInicio, idx);
-      const rel = diffMonths(dueMonth, viewMonth);
-      const isPaid = paidArr.includes(idx);
-      if(rel===0 || (rel<0 && !isPaid)){
-        entries.push({debt:d, idx, dueMonth, isPaid, overdue: rel<0});
+      if(dueMonth === viewMonth){
+        entries.push({debt:d, idx, dueMonth, isPaid: paidArr.includes(idx)});
       }
     }
   });
-  entries.sort((a,b)=> a.dueMonth===b.dueMonth ? a.debt.name.localeCompare(b.debt.name) : (a.dueMonth<b.dueMonth?-1:1));
+  entries.sort((a,b)=> a.debt.name.localeCompare(b.debt.name));
   return entries;
 }
 
@@ -1364,13 +1362,12 @@ function renderDebts(){
     list.innerHTML = entries.map(e => {
       const d = e.debt;
       const parcelaTag = (d.parcelas||1) > 1 ? `<span class="parcela-tag">(${e.idx+1}/${d.parcelas})</span>` : '';
-      const overdueTag = e.overdue ? `<span class="overdue-tag">atrasada · ${formatMonthLabel(e.dueMonth)}</span>` : '';
       const val = installmentValue(d, e.idx);
       return `
         <div class="debt-item">
           <input type="checkbox" class="punch" ${e.isPaid?'checked':''} onchange="togglePaidInstallment('${d.id}', ${e.idx})">
           <div class="name-row">
-            <span class="name ${e.isPaid?'paid':''}">${escapeHtml(d.name)}${parcelaTag}${overdueTag}</span>
+            <span class="name ${e.isPaid?'paid':''}">${escapeHtml(d.name)}${parcelaTag}</span>
             <span class="leader"></span>
           </div>
           <div style="text-align:right;">
