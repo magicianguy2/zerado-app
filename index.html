@@ -677,6 +677,7 @@
       <button class="active" data-view="dividas" onclick="switchTab('dividas')">Dívidas</button>
       <button data-view="metas" onclick="switchTab('metas')">Metas</button>
       <button data-view="calculadora" onclick="switchTab('calculadora')">Calc.</button>
+      <button data-view="config" onclick="switchTab('config')">Config.</button>
     </nav>
 
     <div class="panel">
@@ -823,10 +824,32 @@
         </div>
       </section>
 
+      <!-- ================= CONFIG ================= -->
+      <section id="view-config" class="view">
+        <h2 class="section-title">Configurações</h2>
+        <p class="section-sub">Planilha em uso neste aparelho e opção de trocar.</p>
+
+        <div class="add-form" style="grid-template-columns:1fr;">
+          <div>
+            <label class="field-label">Planilha atual</label>
+            <div class="mono" id="currentSheetLabel" style="font-size:12.5px;padding:8px 0;word-break:break-all;">—</div>
+          </div>
+          <div>
+            <label class="field-label">Trocar para outra planilha (cole o ID)</label>
+            <input id="sheetOverrideInput" type="text" placeholder="ID da outra planilha">
+          </div>
+          <div class="full" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn small" onclick="applySheetOverride()">Trocar planilha</button>
+            <button class="btn small" style="background:var(--paper-2);color:var(--ink);border:1px solid var(--paper-3);" onclick="resetSheetToDefault()">Voltar para a planilha padrão</button>
+          </div>
+          <div id="sheetConfigMsg" class="import-msg" style="margin-top:4px;"></div>
+        </div>
+      </section>
+
     </div>
 
     <div class="perf"></div>
-    <div class="receipt-foot">*** dados guardados na sua planilha do Google (<span id="sheetIdLabel" class="mono"></span>) ***<br><button class="phrase-refresh" style="margin-top:6px;" onclick="forgetSheet()">trocar de planilha / conta →</button></div>
+    <div class="receipt-foot">*** dados guardados na sua planilha do Google (<span id="sheetIdLabel" class="mono"></span>) ***<br><button class="phrase-refresh" style="margin-top:6px;" onclick="forgetSheet()">recarregar / trocar de conta →</button></div>
   </div>
   <div class="torn bottom"></div>
 </div>
@@ -1013,8 +1036,15 @@ function setSyncStatus(state){
   else if(state==='loading'){ el.textContent = 'carregando da planilha…'; el.style.color = 'var(--ink-soft)'; }
 }
 
-function getSheetId(){ return localStorage.getItem('zerado_sheet_id') || ''; }
-function setSheetId(id){ localStorage.setItem('zerado_sheet_id', id); }
+/* ID fixo da sua planilha — assim qualquer aparelho que abrir este arquivo usa
+   sempre a mesma fonte de dados, sem depender de localStorage por dispositivo
+   nem risco de criar uma planilha nova sem querer. */
+const FIXED_SHEET_ID = '1T4pRwlt0pPe6Hc6eR079yyYC2iUhkATvi8o2k2gu2dE';
+function getSheetId(){ return localStorage.getItem('zerado_sheet_override') || FIXED_SHEET_ID; }
+function setSheetId(id){
+  if(!id || id===FIXED_SHEET_ID){ localStorage.removeItem('zerado_sheet_override'); }
+  else { localStorage.setItem('zerado_sheet_override', id); }
+}
 
 function initGis(){
   if(!window.google || !google.accounts){
@@ -1157,11 +1187,7 @@ async function connectGoogle(){
   document.getElementById('authError').style.display='none';
   try{
     await requestToken(true);
-    if(getSheetId()){
-      await bootApp();
-    } else {
-      showSheetStep();
-    }
+    await bootApp();
   }catch(err){
     document.getElementById('authError').textContent = 'Login cancelado ou recusado. Tente de novo.';
     document.getElementById('authError').style.display='block';
@@ -1196,7 +1222,6 @@ async function createNewSheet(){
 }
 
 function forgetSheet(){
-  localStorage.removeItem('zerado_sheet_id');
   location.reload();
 }
 
@@ -1205,9 +1230,35 @@ async function bootApp(){
   document.getElementById('appShell').style.display='block';
   const sid = getSheetId();
   document.getElementById('sheetIdLabel').textContent = sid;
+  renderSheetConfig();
   await loadAll();
   renderDebts();
   renderGoals();
+}
+
+function renderSheetConfig(){
+  const el = document.getElementById('currentSheetLabel');
+  if(el) el.textContent = getSheetId();
+}
+
+async function applySheetOverride(){
+  const input = document.getElementById('sheetOverrideInput');
+  const id = input.value.trim();
+  const msg = document.getElementById('sheetConfigMsg');
+  if(!id){ alert('Cole o ID da planilha que você quer usar.'); return; }
+  if(!confirm('Isso vai trocar a fonte de dados deste aparelho para a planilha informada. Confirma?')) return;
+  setSheetId(id);
+  msg.className = 'import-msg ok';
+  msg.textContent = 'Planilha trocada. Recarregando...';
+  setTimeout(()=>location.reload(), 600);
+}
+
+function resetSheetToDefault(){
+  if(!confirm('Isso vai voltar este aparelho para a planilha padrão. Confirma?')) return;
+  setSheetId(null);
+  document.getElementById('sheetConfigMsg').className = 'import-msg ok';
+  document.getElementById('sheetConfigMsg').textContent = 'Planilha padrão restaurada. Recarregando...';
+  setTimeout(()=>location.reload(), 600);
 }
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
